@@ -1,69 +1,83 @@
-/*  Archivo Jison para el analisis lexicvo y sintactico para el lenguaje de estilos*/
 %{
-
+    /* Archivo Jison para el analisis lexico y sintactico del lenguaje de estilos */
 %}
 
-/*  Analizador lexico*/ 
+/* Analizador lexico */ 
 %lex
 %options case-sensitive
 
 %%
 
 /* Espacios y Comentarios */
-\s+                         /* ignorar espacios */
-"/*"[\s\S]*?"*/"            /* comentarios multilínea */
+\s+                                                                     /* ignorar espacios */
+\/\*[\s\S]*?\*\/                                                        /* comentarios multilínea */
 
-/* Palabras Reservadas y Estructuras */
+/* Palabras Reservadas del Lenguaje */
 "@for"                                                                  return 'FOR';
 "from"                                                                  return 'FROM';
 "through"                                                               return 'THROUGH';
 "to"                                                                    return 'TO';
 "extends"                                                               return 'EXTENDS';
-/* Propiedades*/
+
+/* PROPIEDADES (Ordenadas de mayor a menor longitud para evitar conflictos en el lexer) 
+*/
 "background color"                                                      return 'BACKGROUND_COLOR'; 
-"text align"                                                            return 'TEXT_ALIGN'; 
-"text size"                                                             return 'TEXT_SIZE'; 
-"text font"                                                             return 'TEXT_FONT'; 
-"border radius"                                                         return 'BORDER_RADIUS'; 
-"border style"                                                          return 'BORDER_STYLE'; 
-"border width"                                                          return 'BORDER_WIDTH'; 
-"border color"                                                          return 'BORDER_COLOR'; 
-"border top style"                                                      return 'BORDER_TOP_STYLE'; 
-"height"                                                                return 'HEIGHT';
-"width"                                                                 return 'WIDTH';
-"min-width"                                                             return 'MIN_WIDTH';
-"max-width"                                                             return 'MAX_WIDTH';
+"border bottom style"                                                   return 'BORDER_BOTTOM_STYLE';
+"border bottom width"                                                   return 'BORDER_BOTTOM_WIDTH';
+"border bottom color"                                                   return 'BORDER_BOTTOM_COLOR';
+"border right style"                                                    return 'BORDER_RIGHT_STYLE';
+"border right width"                                                    return 'BORDER_RIGHT_WIDTH';
+"border right color"                                                    return 'BORDER_RIGHT_COLOR';
+"border left style"                                                     return 'BORDER_LEFT_STYLE';
+"border left width"                                                     return 'BORDER_LEFT_WIDTH';
+"border left color"                                                     return 'BORDER_LEFT_COLOR';
+"border top style"                                                      return 'BORDER_TOP_STYLE';
+"border top width"                                                      return 'BORDER_TOP_WIDTH';
+"border top color"                                                      return 'BORDER_TOP_COLOR';
+"padding bottom"                                                        return 'PADDING_BOTTOM';
+"margin bottom"                                                         return 'MARGIN_BOTTOM';
+"border radius"                                                         return 'BORDER_RADIUS';
+"border bottom"                                                         return 'BORDER_BOTTOM';
+"border right"                                                          return 'BORDER_RIGHT';
+"padding right"                                                         return 'PADDING_RIGHT';
+"margin right"                                                          return 'MARGIN_RIGHT';
+"padding left"                                                          return 'PADDING_LEFT';
+"margin left"                                                           return 'MARGIN_LEFT';
+"border style"                                                          return 'BORDER_STYLE';
+"border width"                                                          return 'BORDER_WIDTH';
+"border color"                                                          return 'BORDER_COLOR';
+"padding top"                                                           return 'PADDING_TOP';
+"margin top"                                                            return 'MARGIN_TOP';
+"border left"                                                           return 'BORDER_LEFT';
+"border top"                                                            return 'BORDER_TOP';
+"text align"                                                            return 'TEXT_ALIGN';
+"text font"                                                             return 'TEXT_FONT';
+"text size"                                                             return 'TEXT_SIZE';
 "min-height"                                                            return 'MIN_HEIGHT';
 "max-height"                                                            return 'MAX_HEIGHT';
+"min-width"                                                             return 'MIN_WIDTH';
+"max-width"                                                             return 'MAX_WIDTH';
+"padding"                                                               return 'PADDING';
+"margin"                                                                return 'MARGIN';
+"border"                                                                return 'BORDER';
+"height"                                                                return 'HEIGHT';
+"width"                                                                 return 'WIDTH';
 "color"                                                                 return 'COLOR';
-"padding"(?:\s+(left|top|right|bottom))?    {
-    if(!yytext.includes(" "))                                           return 'PADDING';
-                                                                        return 'PADDING_' + yytext.split(/\s+/)[1].toUpperCase();
-}
-"margin"(?:\s+(left|top|right|bottom))?     {
-    if(!yytext.includes(" "))                                           return 'MARGIN';
-                                                                        return 'MARGIN_' + yytext.split(/\s+/)[1].toUpperCase();
-}
-"border"(?:\s+(top|right|bottom|left))?     {
-    if(!yytext.includes(" "))                                           return 'BORDER';
-                                                                        return 'BORDER_' + yytext.split(/\s+/)[1].toUpperCase();
-}
 
 /* Valores Constantes */
-"CENTER"|"RIGHT"|"LEFT"                                                 return 'DIRECCION';
-"HELVETICA"|"SANS SERIF"|"SANS"|"MONO"|"CURSIVE"                        return 'FONT_FAMILY'; 
-"DOTTED"|"LINE"|"DOUBLE"|"solid"                                        return 'BORDER_KIND';
-"blue"|"white"|"red"|"green"|"violet"|"gray"|"black"|"lightgray"        return 'COLOR_NAME';
+CENTER|RIGHT|LEFT                                                       return 'DIRECCION';
+HELVETICA|SANS\s+SERIF|SANS|MONO|CURSIVE                                return 'FONT_FAMILY'; 
+DOTTED|LINE|DOUBLE|solid                                                return 'BORDER_KIND';
+blue|white|red|green|violet|gray|black|lightgray                        return 'COLOR_NAME';
 "rgb"                                                                   return 'RGB_FUNC';
-"#"([a-fA-F0-9]{3}|[a-fA-F0-9]{6})                                      return 'HEX_COLOR';
+"#"([a-fA-F0-9]{6}|[a-fA-F0-9]{3})\b                                    return 'HEX_COLOR';
 
 /* Símbolos y Operadores */
 "{"                                                                     return '{';
 "}"                                                                     return '}';
 ";"                                                                     return ';';
 "="                                                                     return '=';
-"$"                                                                     return '$';
-"%"                                                                     return '%';
+","                                                                     return ',';
 "("                                                                     return '(';
 ")"                                                                     return ')';
 "*"                                                                     return '*';
@@ -71,20 +85,23 @@
 "+"                                                                     return '+';
 "-"                                                                     return '-';
 
-/* Identificadores y Números */
-[0-9]+("."[0-9]+)?                                                      return 'NUMERO';
-[a-zA-Z][a-zA-Z0-9-]*                                                   return 'IDENTIFICADOR';
-"$"[a-zA-Z0-9_]+                                                        return 'VARIABLE_FOR';
-
+/* Identificadores, Porcentajes y Números */
+[0-9]+"."[0-9]+"%"                                                      return 'PORCENTAJE';
+[0-9]+"%"                                                               return 'PORCENTAJE';
+[0-9]+"."[0-9]+\b                                                       return 'NUMERO';
+[0-9]+\b                                                                return 'NUMERO';
+[a-zA-Z][a-zA-Z0-9-]* return 'IDENTIFICADOR';
+\$[a-zA-Z0-9_]+                                                         return 'VARIABLE_FOR';
+"$"                                                                     return '$';
+"%"                                                                     return '%';
 <<EOF>>                                                                 return 'EOF';
-.                                                                       { console.error('Error léxico: ' + yytext); }
+.                                                                       { console.error('Error léxico en línea ' + yylloc.first_line + ': ' + yytext); }
 
 /lex
 
 /* PRECEDENCIA ARITMÉTICA */
 %left '+' '-'
-%left '*' '/'
-%left '%'
+%left '*' '/' '%'
 %right UMINUS
 
 %start inicio
@@ -110,34 +127,54 @@ definicion_estilo
     | nombre_clase EXTENDS IDENTIFICADOR '{' lista_atributos '}'
     ;
 
-/* Permite nombres como mi-clase-$i */
+/* Permite nombres normales o anidados con variables como my-font-$i */
 nombre_clase
     : IDENTIFICADOR
-    | IDENTIFICADOR '-' '$' IDENTIFICADOR 
+    | IDENTIFICADOR VARIABLE_FOR 
     ;
 
 lista_atributos
     : lista_atributos atributo
-    | atributo
     | /* vacío */
     ;
 
+/* Agrupación inteligente de propiedades para no repetir reglas */
+propiedad_medida
+    : HEIGHT | WIDTH | MIN_WIDTH | MAX_WIDTH | MIN_HEIGHT | MAX_HEIGHT 
+    | TEXT_SIZE | BORDER_RADIUS | BORDER_WIDTH
+    | PADDING | PADDING_LEFT | PADDING_RIGHT | PADDING_TOP | PADDING_BOTTOM
+    | MARGIN | MARGIN_LEFT | MARGIN_RIGHT | MARGIN_TOP | MARGIN_BOTTOM
+    | BORDER_TOP_WIDTH | BORDER_RIGHT_WIDTH | BORDER_BOTTOM_WIDTH | BORDER_LEFT_WIDTH
+    ;
+
+propiedad_estilo_borde
+    : BORDER_STYLE | BORDER_TOP_STYLE | BORDER_RIGHT_STYLE | BORDER_BOTTOM_STYLE | BORDER_LEFT_STYLE
+    ;
+
+propiedad_color_borde
+    : BORDER_COLOR | BORDER_TOP_COLOR | BORDER_RIGHT_COLOR | BORDER_BOTTOM_COLOR | BORDER_LEFT_COLOR
+    ;
+
+propiedad_atajo_borde
+    : BORDER | BORDER_TOP | BORDER_RIGHT | BORDER_BOTTOM | BORDER_LEFT
+    ;
+
+/* Asignación general de atributos */
 atributo
-    : propiedad_simple '=' expresion_numerica ';'
-    | PADDING '=' expresion_numerica ';'
-    | PADDING_LEFT '=' expresion_numerica ';'
+    : propiedad_medida '=' valor_medida ';'
+    | propiedad_estilo_borde '=' BORDER_KIND ';'
+    | propiedad_color_borde '=' valor_color ';'
+    | propiedad_atajo_borde '=' valor_medida BORDER_KIND valor_color ';'
     | BACKGROUND_COLOR '=' valor_color ';'
     | COLOR '=' valor_color ';'
     | TEXT_ALIGN '=' DIRECCION ';'
     | TEXT_FONT '=' FONT_FAMILY ';'
-    | BORDER '=' expresion_numerica BORDER_KIND valor_color ';'
-    | BORDER_RIGHT '=' expresion_numerica BORDER_KIND valor_color ';'
-    /* Agregar las demás variantes de bordes y paddings siguiendo este patrón */
     ;
 
-propiedad_simple
-    : HEIGHT | WIDTH | MIN_WIDTH | MAX_WIDTH | MIN_HEIGHT | MAX_HEIGHT 
-    | TEXT_SIZE | BORDER_RADIUS | BORDER_WIDTH
+/* Permite que las medidas sean números exactos (px), variables matemáticas o porcentajes (%) */
+valor_medida
+    : expresion_numerica
+    | PORCENTAJE
     ;
 
 valor_color
@@ -153,7 +190,7 @@ expresion_numerica
     | expresion_numerica '-' expresion_numerica
     | expresion_numerica '*' expresion_numerica
     | expresion_numerica '/' expresion_numerica
-    | expresion_numerica '%'
+    | expresion_numerica '%' expresion_numerica
     | '(' expresion_numerica ')'
     | '-' expresion_numerica %prec UMINUS
     ;
@@ -169,5 +206,5 @@ tipo_rango
 
 cuerpo_for
     : cuerpo_for definicion_estilo
-    | definicion_estilo
+    | /* vacío */
     ;

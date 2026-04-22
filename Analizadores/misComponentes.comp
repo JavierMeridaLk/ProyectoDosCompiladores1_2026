@@ -1,0 +1,59 @@
+/* Archivo: vistas.comp */
+
+navbar() {
+    <estilo-global> [
+        T("Menú Principal - YFERA")
+    ]
+}
+
+panelUsuario(string username, int userAge, function fnBorrar) {
+    <estilo-global> [
+        /* Prueba de tabla anidada */
+        [[
+            [[
+                [[ T<boton-primario>("Datos del Usuario") ]]
+            ]]
+            [[
+                [[ T("Nombre: $username") ]]
+                [[ T("Edad actual: $userAge, el próximo año tendrá `$userAge + 1`") ]]
+            ]]
+        ]]
+
+        /* Prueba de For Complejo con track y empty */
+        for ($rol : $rolesUsuario, $permiso : $permisos) track $index {
+            T("Permiso `$index + 1`: $permiso en rol $rol")
+        } empty {
+            T("Este usuario no tiene roles asignados.")
+        }
+
+        /* Prueba de Switch */
+        Switch($userAge) {
+            case 18 {
+                T("Apenas es mayor de edad.")
+            },
+            case 21 {
+                T("Mayor de edad internacional.")
+            },
+            default {
+                T("Edad regular.")
+            }
+        }
+
+        /* Formulario robusto */
+        FORM {
+            INPUT_TEXT(
+                id: "motivo",
+                label: "Motivo de eliminación",
+                value: ""
+            )
+            INPUT_BOOL(
+                id: "confirmar",
+                label: "Estoy seguro",
+                value: false
+            )
+        } SUBMIT <boton-primario> {
+            label: "Eliminar Usuario"
+            function: $fnBorrar(@motivo, @confirmar)
+        }
+    ]
+}

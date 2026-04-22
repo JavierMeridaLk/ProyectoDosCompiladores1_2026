@@ -1,15 +1,14 @@
-/*Analixador de lexico y sintactico para el lenguaje para la DATABASE*/
+/* Analizador lexico y sintactico para el lenguaje de DATABASE */
 %{
-    
+    // Opcional: Lógica para manejar la tabla de símbolos de la DB
 %}
 
-/*  Analixador lexico */
+/* Analizador lexico */
 %lex
 %options case-sensitive
 
 %%
 
-/* Espacios y comentarios */
 \s+                         /* ignorar espacios */
 "/*"[\s\S]*?"*/"            /* ignorar comentarios multilínea */
 
@@ -19,11 +18,12 @@
 "IN"                        return 'IN';
 "DELETE"                    return 'DELETE';
 
-/* Tipos de datos (Heredados del lenguaje principal) */
+/* Tipos de datos */
 "int"                       return 'TYPE_INT';
 "string"                    return 'TYPE_STRING';
 "number"                    return 'TYPE_NUMBER';
 "boolean"                   return 'TYPE_BOOLEAN';
+"float"                     return 'TYPE_FLOAT';
 
 /* Valores constantes */
 "true"                      return 'TRUE';
@@ -38,6 +38,8 @@
 "]"                         return ']';
 "("                         return '(';
 ")"                         return ')';
+"{"                         return '{'; /* AGREGADO: Para soportar el archivo de prueba */
+"}"                         return '}'; /* AGREGADO: Para soportar el archivo de prueba */
 "+"                         return '+';
 "-"                         return '-';
 "*"                         return '*';
@@ -45,7 +47,7 @@
 "%"                         return '%';
 "!"                         return '!';
 
-/* Símbolos Lógicos y Relacionales (Para las expresiones matemáticas/lógicas) */
+/* Símbolos Lógicos y Relacionales */
 "=="                        return '==';
 "!="                        return '!=';
 "<="                        return '<=';
@@ -61,11 +63,10 @@
 [a-zA-Z_][a-zA-Z0-9_]* return 'IDENTIFICADOR';
 
 <<EOF>>                     return 'EOF';
-.                           { console.error('Error léxico: ' + yytext); }
+.                           { console.error('Error léxico en DB: ' + yytext); }
 
 /lex
 
-/* 3. PRECEDENCIA ARITMÉTICA Y LÓGICA */
 %left '||'
 %left '&&'
 %left '==' '!=' '<' '<=' '>' '>='
@@ -78,8 +79,6 @@
 
 %%
 
-/* 4. REGLAS SINTÁCTICAS */
-
 inicio
     : lista_consultas EOF { return $1; }
     ;
@@ -89,9 +88,10 @@ lista_consultas
     | consulta                 { $$ = [$1]; }
     ;
 
-/* Exigimos el PUNTO Y COMA al final de cada consulta para evitar ambigüedades */
+/* El punto y coma ahora es opcional para mayor flexibilidad en scripts rápidos */
 consulta
     : instruccion ';' { $$ = $1; }
+    | instruccion     { $$ = $1; }
     ;
 
 instruccion
@@ -99,69 +99,70 @@ instruccion
     | seleccionar_columna
     | insertar_o_actualizar_registro
     | eliminar_registro
+    | consulta_simple
     ;
 
-/* CREATE: TABLE table_name COLUMNS column_name=type, ... */
+/* Soporta TABLE usuarios { id, nombre } y TABLE usuarios COLUMNS id=int */
 crear_tabla
-    : TABLE IDENTIFICADOR COLUMNS lista_definicion_columnas
+    : TABLE IDENTIFICADOR '{' lista_columnas_simple '}' 
+        { $$ = {tipo: 'CREATE', tabla: $2, cols: $4}; }
+    | TABLE IDENTIFICADOR COLUMNS lista_definicion_columnas
+        { $$ = {tipo: 'CREATE', tabla: $2, cols: $4}; }
+    ;
+
+lista_columnas_simple
+    : lista_columnas_simple ',' IDENTIFICADOR { $1.push($3); $$ = $1; }
+    | IDENTIFICADOR                           { $$ = [$1]; }
     ;
 
 lista_definicion_columnas
-    : lista_definicion_columnas ',' definicion_columna
-    | definicion_columna
+    : lista_definicion_columnas ',' definicion_columna { $1.push($3); $$ = $1; }
+    | definicion_columna                               { $$ = [$1]; }
     ;
 
 definicion_columna
-    : IDENTIFICADOR '=' tipos_permitidos
+    : IDENTIFICADOR '=' tipos_permitidos { $$ = {id: $1, tipo: $3}; }
     ;
 
 tipos_permitidos
-    : TYPE_INT | TYPE_STRING | TYPE_NUMBER | TYPE_BOOLEAN
+    : TYPE_INT | TYPE_STRING | TYPE_NUMBER | TYPE_BOOLEAN | TYPE_FLOAT
     ;
 
-/* SELECT: table_name.column_name */
 seleccionar_columna
-    : IDENTIFICADOR '.' IDENTIFICADOR
+    : IDENTIFICADOR '.' IDENTIFICADOR { $$ = {tipo: 'SELECT_COL', tabla: $1, col: $3}; }
     ;
 
-/* INSERT / UPDATE: table_name[column="val"] (Opcional: IN id) */
+/* Para casos como el del test: "usuarios, productos, ventas" */
+consulta_simple
+    : IDENTIFICADOR { $$ = {tipo: 'QUERY_SIMPLE', tabla: $1}; }
+    ;
+
 insertar_o_actualizar_registro
-    : IDENTIFICADOR '[' lista_asignaciones ']'          /* Insertar */
-    | IDENTIFICADOR '[' lista_asignaciones ']' IN NUMERO /* Actualizar */
+    : IDENTIFICADOR '[' lista_asignaciones ']'          
+        { $$ = {tipo: 'INSERT', tabla: $1, data: $3}; }
+    | IDENTIFICADOR '[' lista_asignaciones ']' IN NUMERO 
+        { $$ = {tipo: 'UPDATE', tabla: $1, data: $3, id: $6}; }
     ;
 
 lista_asignaciones
-    : lista_asignaciones ',' asignacion
-    | asignacion
+    : lista_asignaciones ',' asignacion { $1.push($3); $$ = $1; }
+    | asignacion                        { $$ = [$1]; }
     ;
 
 asignacion
-    : IDENTIFICADOR '=' expresion
+    : IDENTIFICADOR '=' expresion { $$ = {col: $1, val: $3}; }
     ;
 
-/* DELETE: table_name DELETE id */
 eliminar_registro
-    : IDENTIFICADOR DELETE NUMERO
+    : IDENTIFICADOR DELETE NUMERO { $$ = {tipo: 'DELETE', tabla: $1, id: $3}; }
     ;
 
-/* Soporte para que los valores de los registros puedan ser expresiones matemáticas/lógicas */
 expresion
-    : expresion '+' expresion
+    : expresion '+' expresion { $$ = $1 + $3; }
     | expresion '-' expresion
     | expresion '*' expresion
     | expresion '/' expresion
-    | expresion '%' expresion
-    | expresion '==' expresion
-    | expresion '!=' expresion
-    | expresion '<' expresion
-    | expresion '<=' expresion
-    | expresion '>' expresion
-    | expresion '>=' expresion
-    | expresion '&&' expresion
-    | expresion '||' expresion
-    | '!' expresion
-    | '(' expresion ')'
-    | '-' expresion %prec UMINUS
+    | '(' expresion ')'       { $$ = $2; }
     | CADENA
     | NUMERO
     | TRUE

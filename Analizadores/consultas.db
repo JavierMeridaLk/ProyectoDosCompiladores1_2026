@@ -1,0 +1,17 @@
+/* Archivo: usuarios.db */
+
+/* Creación con múltiples tipos soportados */
+TABLE usuarios COLUMNS nombre = string, edad = int, saldo = float, activo = boolean;
+
+/* Inserciones simples y con expresiones aritméticas */
+usuarios[nombre = "Carlos", edad = 20 + 5, saldo = 1500.50, activo = true];
+usuarios[nombre = "Ana", edad = 30, saldo = 0.0, activo = false];
+
+/* Actualización condicionada por el ID (IN) usando operaciones lógicas */
+usuarios[saldo = 1500.50 * 1.10, activo = true] IN 1;
+
+/* Eliminación */
+usuarios DELETE 2;
+
+/* Selección simple */
+usuarios.saldo;

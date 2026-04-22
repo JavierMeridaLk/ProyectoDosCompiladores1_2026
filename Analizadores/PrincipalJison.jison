@@ -1,9 +1,9 @@
-/*  Analizador lexico del l enguaje principal*/
+/* Analizador lexico del lenguaje principal */
 %{
     
 %}
 
-/*  Analizador léxico */
+/* Analizador léxico */
 %lex
 %options case-sensitive
 
@@ -42,6 +42,14 @@
 "break"                     return 'BREAK';
 "continue"                  return 'CONTINUE';
 
+/* Símbolos Relacionales y Lógicos (¡Siempre antes de los de 1 caracter!) */
+"=="                        return '==';
+"!="                        return '!=';
+"<="                        return '<=';
+">="                        return '>=';
+"&&"                        return '&&';
+"||"                        return '||';
+
 /* Símbolos Simples */
 "@"                         return '@';
 ";"                         return ';';
@@ -60,16 +68,8 @@
 "/"                         return '/';
 "%"                         return '%';
 "!"                         return '!';
-
-/* Símbolos Relacionales y Lógicos */
-"=="                        return '==';
-"!="                        return '!=';
-"<="                        return '<=';
-">="                        return '>=';
 "<"                         return '<';
 ">"                         return '>';
-"&&"                        return '&&';
-"||"                        return '||';
 
 /* Expresiones Regulares para Valores */
 \"([^\"\\]|\\.)*\"          return 'CADENA';
@@ -121,6 +121,8 @@ lista_declaraciones
 
 declaracion
     : tipo IDENTIFICADOR '=' expresion ';'
+    /* Declaración sin inicializar (ej. int i;) */
+    | tipo IDENTIFICADOR ';'
     /* Arreglo vacío con tamaño: int[] arr = [3]; */
     | tipo '[' ']' IDENTIFICADOR '=' '[' expresion ']' ';'
     /* Arreglo inicializado: string[] arr = {"a", "b"}; */
@@ -171,7 +173,8 @@ instrucciones_main
     ;
 
 instruccion_main
-    : invocacion_componente
+    : declaracion              /* <-- CORRECCIÓN: Ahora puedes declarar variables locales en el main y en ciclos */
+    | invocacion_componente
     | asignacion
     | logica_if
     | logica_switch
@@ -232,9 +235,10 @@ logica_for
     : FOR '(' asignacion_for ';' expresion ';' asignacion_for ')' '{' instrucciones_main '}'
     ;
 
-/* El for acepta asignaciones sin punto y coma para su cabecera */
+/* --- CORRECCIÓN: El for ahora acepta declaraciones con tipo (ej: int i = 0) --- */
 asignacion_for
-    : IDENTIFICADOR '=' expresion
+    : tipo IDENTIFICADOR '=' expresion
+    | IDENTIFICADOR '=' expresion
     | /* vacío */
     ;
 
