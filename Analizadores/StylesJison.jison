@@ -118,93 +118,124 @@ cuerpo
     ;
 
 elemento
-    : definicion_estilo
-    | bucle_for
+    : definicion_estilo { $$ = $1; }
+    | bucle_for         { $$ = $1; }
     ;
 
 definicion_estilo
     : nombre_clase '{' lista_atributos '}' 
+        { $$ = { tipo: 'REGLA', selector: $1, propiedades: $3, extends: null }; }
     | nombre_clase EXTENDS IDENTIFICADOR '{' lista_atributos '}'
+        { $$ = { tipo: 'REGLA', selector: $1, propiedades: $5, extends: $3 }; }
     ;
 
-/* Permite nombres normales o anidados con variables como my-font-$i */
+/* Permite nombres como .boton-$i */
 nombre_clase
-    : IDENTIFICADOR
+    : IDENTIFICADOR 
+        { $$ = $1; }
     | IDENTIFICADOR VARIABLE_FOR 
+        { $$ = $1 + $2; }
     ;
 
 lista_atributos
-    : lista_atributos atributo
-    | /* vacío */
+    : lista_atributos atributo { $1.push($2); $$ = $1; }
+    | /* vacío */              { $$ = []; }
     ;
 
-/* Agrupación inteligente de propiedades para no repetir reglas */
+atributo
+    : propiedad_medida '=' valor_medida ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | propiedad_estilo_borde '=' BORDER_KIND ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | propiedad_color_borde '=' valor_color ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | propiedad_atajo_borde '=' valor_medida BORDER_KIND valor_color ';'
+        { $$ = { propiedad: $1, valor: `${$3} ${$4} ${$5}` }; }
+    | BACKGROUND_COLOR '=' valor_color ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | COLOR '=' valor_color ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | TEXT_ALIGN '=' DIRECCION ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    | TEXT_FONT '=' FONT_FAMILY ';'
+        { $$ = { propiedad: $1, valor: $3 }; }
+    ;
+
+/* --- RETORNO DE LOS NOMBRES DE PROPIEDAD --- */
 propiedad_medida
     : HEIGHT | WIDTH | MIN_WIDTH | MAX_WIDTH | MIN_HEIGHT | MAX_HEIGHT 
-    | TEXT_SIZE | BORDER_RADIUS | BORDER_WIDTH
-    | PADDING | PADDING_LEFT | PADDING_RIGHT | PADDING_TOP | PADDING_BOTTOM
-    | MARGIN | MARGIN_LEFT | MARGIN_RIGHT | MARGIN_TOP | MARGIN_BOTTOM
-    | BORDER_TOP_WIDTH | BORDER_RIGHT_WIDTH | BORDER_BOTTOM_WIDTH | BORDER_LEFT_WIDTH
+    | TEXT_SIZE | BORDER_RADIUS | BORDER_WIDTH | PADDING | MARGIN 
+    | PADDING_LEFT | PADDING_RIGHT | PADDING_TOP | PADDING_BOTTOM
+    | MARGIN_LEFT | MARGIN_RIGHT | MARGIN_TOP | MARGIN_BOTTOM
+    { $$ = $1; }
     ;
 
 propiedad_estilo_borde
     : BORDER_STYLE | BORDER_TOP_STYLE | BORDER_RIGHT_STYLE | BORDER_BOTTOM_STYLE | BORDER_LEFT_STYLE
+    { $$ = $1; }
     ;
 
 propiedad_color_borde
     : BORDER_COLOR | BORDER_TOP_COLOR | BORDER_RIGHT_COLOR | BORDER_BOTTOM_COLOR | BORDER_LEFT_COLOR
+    { $$ = $1; }
     ;
 
 propiedad_atajo_borde
     : BORDER | BORDER_TOP | BORDER_RIGHT | BORDER_BOTTOM | BORDER_LEFT
+    { $$ = $1; }
     ;
 
-/* Asignación general de atributos */
-atributo
-    : propiedad_medida '=' valor_medida ';'
-    | propiedad_estilo_borde '=' BORDER_KIND ';'
-    | propiedad_color_borde '=' valor_color ';'
-    | propiedad_atajo_borde '=' valor_medida BORDER_KIND valor_color ';'
-    | BACKGROUND_COLOR '=' valor_color ';'
-    | COLOR '=' valor_color ';'
-    | TEXT_ALIGN '=' DIRECCION ';'
-    | TEXT_FONT '=' FONT_FAMILY ';'
-    ;
-
-/* Permite que las medidas sean números exactos (px), variables matemáticas o porcentajes (%) */
 valor_medida
-    : expresion_numerica
-    | PORCENTAJE
+    : expresion_numerica { $$ = $1; }
+    | PORCENTAJE         { $$ = $1; }
     ;
 
 valor_color
-    : COLOR_NAME
-    | HEX_COLOR
-    | RGB_FUNC '(' NUMERO ',' NUMERO ',' NUMERO ')'
+    : COLOR_NAME { $$ = $1; }
+    | HEX_COLOR  { $$ = $1; }
+    | RGB_FUNC '(' expresion_numerica ',' expresion_numerica ',' expresion_numerica ')' 
+    { 
+        $$ = { 
+            tipo: "rgb", 
+            r: $3, 
+            g: $5, 
+            b: $7 
+        }; 
+    }
     ;
 
 expresion_numerica
-    : NUMERO
-    | VARIABLE_FOR
-    | expresion_numerica '+' expresion_numerica
-    | expresion_numerica '-' expresion_numerica
-    | expresion_numerica '*' expresion_numerica
-    | expresion_numerica '/' expresion_numerica
-    | expresion_numerica '%' expresion_numerica
-    | '(' expresion_numerica ')'
-    | '-' expresion_numerica %prec UMINUS
+    : NUMERO       { $$ = $1; }
+    | VARIABLE_FOR { $$ = $1; }
+    | expresion_numerica '+' expresion_numerica { $$ = { op: '+', izq: $1, der: $3 }; }
+    | expresion_numerica '-' expresion_numerica { $$ = { op: '-', izq: $1, der: $3 }; }
+    | expresion_numerica '*' expresion_numerica { $$ = { op: '*', izq: $1, der: $3 }; }
+    | expresion_numerica '/' expresion_numerica { $$ = { op: '/', izq: $1, der: $3 }; }
+    | expresion_numerica '%' expresion_numerica { $$ = { op: '%', izq: $1, der: $3 }; }
+    | '(' expresion_numerica ')' { $$ = $2; }
+    | '-' expresion_numerica %prec UMINUS { $$ = { op: 'neg', der: $2 }; }
     ;
 
 bucle_for
     : FOR VARIABLE_FOR FROM expresion_numerica tipo_rango expresion_numerica '{' cuerpo_for '}'
+        { 
+            $$ = { 
+                tipo: 'FOR', 
+                variable: $2, 
+                inicio: $4, 
+                fin: $6, 
+                iteracion: $5, 
+                cuerpo: $8 
+            }; 
+        }
     ;
 
 tipo_rango
-    : THROUGH
-    | TO
+    : THROUGH { $$ = 'through'; }
+    | TO      { $$ = 'to'; }
     ;
 
 cuerpo_for
-    : cuerpo_for definicion_estilo
-    | /* vacío */
+    : cuerpo_for definicion_estilo { $1.push($2); $$ = $1; }
+    | /* vacío */                 { $$ = []; }
     ;
