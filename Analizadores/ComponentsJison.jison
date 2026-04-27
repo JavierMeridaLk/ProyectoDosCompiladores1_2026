@@ -12,11 +12,15 @@
 
 \s+                         /* ignorar espacios */
 \/\*[\s\S]*?\*\/            /* ignorar comentarios multilínea */
+\/\/.* /* NUEVO: ignorar comentarios de una línea */
 
 /* Tipos de Datos */
 "int"                       return 'INT';
 "string"                    return 'STRING';
 "function"                  return 'FUNCTION';
+"bool"                      return 'BOOL';
+"boolean"                   return 'BOOL';   /* Soporte para boolean */
+"array"                     return 'ARRAY';  /* Soporte para array */
 
 /* Componentes Visuales y Formularios */
 "T"                         return 'T';
@@ -41,6 +45,7 @@
 "empty"                     return 'EMPTY';
 "if"                        return 'IF';
 "else"                      return 'ELSE';
+"switch"                    return 'SWITCH'; /* Estándar en minúscula */
 "Switch"                    return 'SWITCH';
 "case"                      return 'CASE';
 "default"                   return 'DEFAULT';
@@ -81,7 +86,7 @@
 [a-zA-Z_][a-zA-Z0-9_-]* return 'IDENTIFICADOR';
 
 <<EOF>>                     return 'EOF';
-.                           { console.error('Error léxico en línea ' + yylloc.first_line + ': ' + yytext); }
+.                           { throw new Error('Error léxico en línea ' + yylloc.first_line + ': ' + yytext); }
 
 /lex
 
@@ -131,7 +136,8 @@ parametro
     | tipo VARIABLE      { $$ = {tipo: $1, id: $2}; }
     ;
 
-tipo : INT | STRING | FUNCTION ;
+/* NUEVO: Se añade ARRAY a los tipos permitidos */
+tipo : INT | STRING | FUNCTION | BOOL | ARRAY ;
 
 /* --- MANEJO DE ELEMENTOS --- */
 
@@ -192,7 +198,6 @@ lista_columnas
     | columna                { $$ = [$1]; }
     ;
 
-/* Cambio: Se elimina 'columna : elemento' para evitar conflicto con la lista de elementos genérica */
 columna
     : '[[' elementos ']]' { $$ = {tipo: 'CELDA', contenido: $2}; }
     ;
@@ -261,7 +266,13 @@ prop_input
     | PR_VALUE ':' valor { $$ = {value: $3}; }
     ;
 
-valor : CADENA | VARIABLE | NUMERO | TRUE | FALSE ;
+valor
+    : CADENA   { $$ = { tipo: 'STRING', val: yytext.slice(1,-1) }; }
+    | VARIABLE { $$ = { tipo: 'VAR', val: yytext }; }
+    | NUMERO   { $$ = { tipo: 'NUM', val: Number(yytext) }; }
+    | TRUE     { $$ = { tipo: 'BOOL', val: true }; }
+    | FALSE    { $$ = { tipo: 'BOOL', val: false }; }
+    ;
 
 /* --- LÓGICA --- */
 
@@ -285,10 +296,17 @@ empty_opt
 logica_if
     : IF '(' expresion ')' '{' elementos '}' %prec IF_SIN_ELSE
         { $$ = {tipo: 'IF', cond: $3, body: $6, sino: null}; }
-    | IF '(' expresion ')' '{' elementos '}' ELSE '{' elementos '}'
-        { $$ = {tipo: 'IF', cond: $3, body: $6, sino: {tipo: 'ELSE', body: $10}}; }
-    | IF '(' expresion ')' '{' elementos '}' ELSE logica_if
-        { $$ = {tipo: 'IF', cond: $3, body: $6, sino: $9}; }
+    | IF '(' expresion ')' '{' elementos '}' cadena_else
+        { $$ = {tipo: 'IF', cond: $3, body: $6, sino: $8}; }
+    ;
+
+cadena_else
+    : ELSE '(' expresion ')' '{' elementos '}' %prec IF_SIN_ELSE
+        { $$ = {tipo: 'IF', cond: $3, body: $6, sino: null}; }
+    | ELSE '(' expresion ')' '{' elementos '}' cadena_else
+        { $$ = {tipo: 'IF', cond: $3, body: $6, sino: $8}; }
+    | ELSE '{' elementos '}'
+        { $$ = {tipo: 'ELSE', body: $3}; }
     ;
 
 logica_switch
@@ -306,12 +324,11 @@ lista_cases
     | caso { $$ = [$1]; }
     ;
 
+/* NUEVO: Reutiliza la regla "valor" para estructurar correctamente el AST */
 caso
-    : CASE valor_case '{' elementos '}' ',' { $$ = {val: $2, body: $4}; }
-    | CASE valor_case '{' elementos '}'     { $$ = {val: $2, body: $4}; }
+    : CASE valor '{' elementos '}' ',' { $$ = {val: $2, body: $4}; }
+    | CASE valor '{' elementos '}'     { $$ = {val: $2, body: $4}; }
     ;
-
-valor_case : CADENA | NUMERO ;
 
 default_opt
     : DEFAULT '{' elementos '}' { $$ = $3; }
@@ -319,15 +336,19 @@ default_opt
     ;
 
 expresion
-    : expresion '+' expresion { $$ = {op: '+', izq: $1, der: $3}; }
-    | expresion '-' expresion { $$ = {op: '-', izq: $1, der: $3}; }
-    | expresion '*' expresion { $$ = {op: '*', izq: $1, der: $3}; }
-    | expresion '/' expresion { $$ = {op: '/', izq: $1, der: $3}; }
-    | expresion '==' expresion { $$ = {op: '==', izq: $1, der: $3}; }
-    | expresion '!=' expresion { $$ = {op: '!=', izq: $1, der: $3}; }
-    | expresion '&&' expresion { $$ = {op: '&&', izq: $1, der: $3}; }
-    | expresion '||' expresion { $$ = {op: '||', izq: $1, der: $3}; }
-    | '!' expresion           { $$ = {op: '!', der: $2}; }
-    | '(' expresion ')'       { $$ = $2; }
-    | valor                   { $$ = $1; }
+    : expresion '+' expresion   { $$ = {op: '+', izq: $1, der: $3}; }
+    | expresion '-' expresion   { $$ = {op: '-', izq: $1, der: $3}; }
+    | expresion '*' expresion   { $$ = {op: '*', izq: $1, der: $3}; }
+    | expresion '/' expresion   { $$ = {op: '/', izq: $1, der: $3}; }
+    | expresion '>' expresion   { $$ = {op: '>', izq: $1, der: $3}; }
+    | expresion '<' expresion   { $$ = {op: '<', izq: $1, der: $3}; }
+    | expresion '>=' expresion  { $$ = {op: '>=', izq: $1, der: $3}; }
+    | expresion '<=' expresion  { $$ = {op: '<=', izq: $1, der: $3}; }
+    | expresion '==' expresion  { $$ = {op: '==', izq: $1, der: $3}; }
+    | expresion '!=' expresion  { $$ = {op: '!=', izq: $1, der: $3}; }
+    | expresion '&&' expresion  { $$ = {op: '&&', izq: $1, der: $3}; }
+    | expresion '||' expresion  { $$ = {op: '||', izq: $1, der: $3}; }
+    | '!' expresion             { $$ = {op: '!', der: $2}; }
+    | '(' expresion ')'         { $$ = $2; }
+    | valor                     { $$ = $1; }
     ;

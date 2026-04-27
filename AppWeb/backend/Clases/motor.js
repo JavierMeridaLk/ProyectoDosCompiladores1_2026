@@ -1,48 +1,70 @@
 const fs = require('fs');
 const path = require('path');
-const TraductorCSS = require('./traductorCSS'); // Ajusta la ruta según tu estructura
+
+const TraductorCSS = require('./traductorCSS');
+const TraductorComponentes = require('./traductorComponentes');
 
 class Motor {
+
     /**
-     * Ejecuta el proceso de traducción de un archivo
-     * @param {string} rutaEntrada - Ruta del archivo .styles
-     * @param {string} nombreSalida - Nombre del archivo .css resultante
+     * Ejecuta traducción automática según extensión
      */
-    static ejecutar(rutaEntrada, nombreSalida) {
+    static ejecutar(rutaEntrada) {
         console.log("🚀 Iniciando proceso de traducción...");
 
         try {
-            // 1. Verificar si el archivo existe
             if (!fs.existsSync(rutaEntrada)) {
-                throw new Error(`El archivo de entrada no existe en: ${rutaEntrada}`);
+                throw new Error(`El archivo no existe: ${rutaEntrada}`);
             }
 
-            // 2. Leer el contenido del archivo .styles
             const contenido = fs.readFileSync(rutaEntrada, 'utf-8');
             console.log("📄 Archivo leído correctamente.");
 
-            // 3. Llamar al traductor (que internamente usa el parser)
-            const resultadoCSS = TraductorCSS.analizar(contenido);
+            const ext = path.extname(rutaEntrada);
 
-            // 4. Crear carpeta de salida si no existe
+            let resultado = "";
+            let nombreSalida = "";
+
+            // 🔥 DETECCIÓN AUTOMÁTICA
+            if (ext === '.styles') {
+                resultado = TraductorCSS.analizar(contenido);
+                nombreSalida = 'estilosGenerados.css';
+
+            } else if (ext === '.comp') {
+                resultado = TraductorComponentes.analizar(contenido);
+                nombreSalida = 'componentesGenerados.js';
+
+            } else {
+                throw new Error(`Extensión no soportada: ${ext}`);
+            }
+
+            // Crear carpeta output
             const carpetaSalida = './output';
             if (!fs.existsSync(carpetaSalida)) {
                 fs.mkdirSync(carpetaSalida);
             }
 
-            // 5. Escribir el archivo final
-            const rutaCompletaSalida = path.join(carpetaSalida, nombreSalida);
-            fs.writeFileSync(rutaCompletaSalida, resultadoCSS);
+            const rutaSalida = path.join(carpetaSalida, nombreSalida);
+            fs.writeFileSync(rutaSalida, resultado);
 
-            console.log(`✅ Traducción exitosa. Archivo generado en: ${rutaCompletaSalida}`);
-            
+            console.log(`✅ Traducción exitosa → ${rutaSalida}`);
+
         } catch (error) {
             console.error("❌ Error en el motor:");
-            console.error(error.message);
+            console.error(error);
         }
     }
 }
 
-// --- PRUEBA DE EJECUCIÓN ---
-// Esto permite ejecutarlo directamente con: node Motor.js
-Motor.ejecutar('./entrada.styles', 'estilosGenerados.css');
+module.exports = Motor;
+
+
+// ----------------------
+// PRUEBAS
+// ----------------------
+
+// 🔹 CSS
+Motor.ejecutar('./entrada.styles');
+
+// 🔹 COMPONENTES
+Motor.ejecutar('./entrada.comp');
