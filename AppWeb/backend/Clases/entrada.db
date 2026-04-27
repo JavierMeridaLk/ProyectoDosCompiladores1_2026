@@ -1,0 +1,28 @@
+/*
+    Crear una tabla, 
+    los tipos que se manejan son los mismos que los del lenguaje principal
+*/
+TABLE table_name COLUMNS column_name=string, column2_name=number;
+
+/*
+    Seleccionar todas las columnas de una tabla particular, 
+    esto devuelve un array del tipo de la columna
+*/
+table_name.column_name;
+
+/*
+    Crea un registro
+*/
+table_name[column_name="value", column2_name=0.0];
+
+/*
+    Actualiza un registro, 
+    la condición es obligatoria y siempre compara con el id
+*/
+table_name[column_name="new value", column2_name=10.10] IN 1;
+
+/*
+    Elimina  un registro de una tabla, 
+    la condición es obligatoria y siempre compara con el id
+*/
+table_name DELETE 1;

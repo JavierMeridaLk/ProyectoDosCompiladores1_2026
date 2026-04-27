@@ -1,8 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const TraductorCSS = require('./traductorCSS');
+// Importamos los tres traductores
+const TraductorCSS = require('./traductorCSS'); // Asegúrate de que las rutas sean correctas
 const TraductorComponentes = require('./traductorComponentes');
+const TraductorDB = require('./traductorDB'); // <-- NUEVO
 
 class Motor {
 
@@ -10,7 +12,7 @@ class Motor {
      * Ejecuta traducción automática según extensión
      */
     static ejecutar(rutaEntrada) {
-        console.log("🚀 Iniciando proceso de traducción...");
+        console.log(`🚀 Iniciando proceso de traducción para: ${rutaEntrada}`);
 
         try {
             if (!fs.existsSync(rutaEntrada)) {
@@ -34,11 +36,15 @@ class Motor {
                 resultado = TraductorComponentes.analizar(contenido);
                 nombreSalida = 'componentesGenerados.js';
 
+            } else if (ext === '.db') { // <-- NUEVA REGLA PARA BASE DE DATOS
+                resultado = TraductorDB.analizar(contenido);
+                nombreSalida = 'consultasGeneradas.sql';
+
             } else {
                 throw new Error(`Extensión no soportada: ${ext}`);
             }
 
-            // Crear carpeta output
+            // Crear carpeta output si no existe
             const carpetaSalida = './output';
             if (!fs.existsSync(carpetaSalida)) {
                 fs.mkdirSync(carpetaSalida);
@@ -47,11 +53,11 @@ class Motor {
             const rutaSalida = path.join(carpetaSalida, nombreSalida);
             fs.writeFileSync(rutaSalida, resultado);
 
-            console.log(`✅ Traducción exitosa → ${rutaSalida}`);
+            console.log(`✅ Traducción exitosa → ${rutaSalida}\n`);
 
         } catch (error) {
-            console.error("❌ Error en el motor:");
-            console.error(error);
+            console.error(`❌ Error en el motor al procesar ${rutaEntrada}:`);
+            console.error(error.message, '\n');
         }
     }
 }
@@ -63,8 +69,8 @@ module.exports = Motor;
 // PRUEBAS
 // ----------------------
 
-// 🔹 CSS
 Motor.ejecutar('./entrada.styles');
 
-// 🔹 COMPONENTES
 Motor.ejecutar('./entrada.comp');
+
+Motor.ejecutar('./entrada.db');
