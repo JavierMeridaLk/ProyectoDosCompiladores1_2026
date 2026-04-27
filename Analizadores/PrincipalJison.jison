@@ -1,6 +1,6 @@
-/* Analizador lexico del lenguaje principal */
+/* Analizador lexico y sintactico del lenguaje principal */
 %{
-    
+    // Opcional: Lógica inicial si la necesitas
 %}
 
 /* Analizador léxico */
@@ -42,7 +42,7 @@
 "break"                     return 'BREAK';
 "continue"                  return 'CONTINUE';
 
-/* Símbolos Relacionales y Lógicos (¡Siempre antes de los de 1 caracter!) */
+/* Símbolos Relacionales y Lógicos */
 "=="                        return '==';
 "!="                        return '!=';
 "<="                        return '<=';
@@ -105,30 +105,36 @@ inicio
 
 programa
     : lista_imports lista_declaraciones lista_funciones MAIN '{' instrucciones_main '}'
+      { $$ = { imports: $1, globales: $2, funciones: $3, main: $6 }; }
     ;
 
 /* --- IMPORTS --- */
 lista_imports
-    : lista_imports IMPORT CADENA ';'
-    | /* vacío */
+    : lista_imports IMPORT CADENA ';' { $1.push({ path: $3 }); $$ = $1; }
+    | /* vacío */                     { $$ = []; }
     ;
 
 /* --- VARIABLES GLOBALES --- */
 lista_declaraciones
-    : lista_declaraciones declaracion
-    | /* vacío */
+    : lista_declaraciones declaracion { $1.push($2); $$ = $1; }
+    | /* vacío */                     { $$ = []; }
     ;
 
 declaracion
     : tipo IDENTIFICADOR '=' expresion ';'
+      { $$ = { tipo: 'DECLARACION', id: $2, exp: $4 }; }
     /* Declaración sin inicializar (ej. int i;) */
     | tipo IDENTIFICADOR ';'
+      { $$ = { tipo: 'DECLARACION', id: $2, exp: null }; }
     /* Arreglo vacío con tamaño: int[] arr = [3]; */
     | tipo '[' ']' IDENTIFICADOR '=' '[' expresion ']' ';'
+      { $$ = { tipo: 'DECLARACION_ARR_VACIO', id: $4, size: $7 }; }
     /* Arreglo inicializado: string[] arr = {"a", "b"}; */
     | tipo '[' ']' IDENTIFICADOR '=' '{' lista_expresiones '}' ';'
+      { $$ = { tipo: 'DECLARACION_ARR_VALORES', id: $4, vals: $7 }; }
     /* Arreglo por DB: float[] myTeam = execute `query`; */
     | tipo '[' ']' IDENTIFICADOR '=' EXECUTE QUERY_SQL ';'
+      { $$ = { tipo: 'DECLARACION_ARR_DB', id: $4, query: $7.replace(/^\`|\`$/g, '') }; }
     ;
 
 tipo
@@ -137,145 +143,155 @@ tipo
 
 /* --- FUNCIONES --- */
 lista_funciones
-    : lista_funciones funcion
-    | /* vacío */
+    : lista_funciones funcion { $1.push($2); $$ = $1; }
+    | /* vacío */             { $$ = []; }
     ;
 
 funcion
     : FUNCTION IDENTIFICADOR '(' parametros_opt ')' '{' instrucciones_funcion '}'
+      { $$ = { id: $2, params: $4, body: $7 }; }
     ;
 
 parametros_opt
-    : lista_parametros
-    | /* vacío */
+    : lista_parametros { $$ = $1; }
+    | /* vacío */      { $$ = []; }
     ;
 
 lista_parametros
-    : lista_parametros ',' tipo IDENTIFICADOR
-    | tipo IDENTIFICADOR
+    : lista_parametros ',' tipo IDENTIFICADOR { $1.push({ tipo: $3, id: $4 }); $$ = $1; }
+    | tipo IDENTIFICADOR                      { $$ = [{ tipo: $1, id: $2 }]; }
     ;
 
 /* Las funciones solo pueden ejecutar DB o cargar archivos/variables */
 instrucciones_funcion
-    : instrucciones_funcion instruccion_funcion
-    | /* vacío */
+    : instrucciones_funcion instruccion_funcion { $1.push($2); $$ = $1; }
+    | /* vacío */                               { $$ = []; }
     ;
 
 instruccion_funcion
-    : EXECUTE QUERY_SQL ';'
-    | LOAD expresion ';'
+    : EXECUTE QUERY_SQL ';' { $$ = { tipo: 'EXECUTE', query: $2.replace(/^\`|\`$/g, '') }; }
+    | LOAD expresion ';'    { $$ = { tipo: 'LOAD', path: $2 }; }
     ;
 
 /* --- BLOQUE MAIN Y LÓGICA --- */
 instrucciones_main
-    : instrucciones_main instruccion_main
-    | /* vacío */
+    : instrucciones_main instruccion_main { $1.push($2); $$ = $1; }
+    | /* vacío */                         { $$ = []; }
     ;
 
 instruccion_main
-    : declaracion              /* <-- CORRECCIÓN: Ahora puedes declarar variables locales en el main y en ciclos */
-    | invocacion_componente
-    | asignacion
-    | logica_if
-    | logica_switch
-    | logica_while
-    | logica_do_while
-    | logica_for
-    | BREAK ';'
-    | CONTINUE ';'
+    : declaracion            { $$ = $1; }
+    | invocacion_componente  { $$ = $1; }
+    | asignacion             { $$ = $1; }
+    | logica_if              { $$ = $1; }
+    | logica_switch          { $$ = $1; }
+    | logica_while           { $$ = $1; }
+    | logica_do_while        { $$ = $1; }
+    | logica_for             { $$ = $1; }
+    | BREAK ';'              { $$ = { tipo: 'BREAK' }; }
+    | CONTINUE ';'           { $$ = { tipo: 'CONTINUE' }; }
     ;
 
 invocacion_componente
     : '@' IDENTIFICADOR '(' lista_expresiones_opt ')' ';'
+      { $$ = { tipo: 'COMP_CALL', id: $2, args: $4 }; }
     ;
 
 asignacion
     : IDENTIFICADOR '=' expresion ';'
-    | IDENTIFICADOR '[' expresion ']' '=' expresion ';' /* Asignar a posición de arreglo */
+      { $$ = { tipo: 'ASIGNACION', id: $1, exp: $3 }; }
+    | IDENTIFICADOR '[' expresion ']' '=' expresion ';' 
+      { $$ = { tipo: 'ASIGNACION_ARR', id: $1, index: $3, exp: $6 }; }
     ;
 
 /* --- ESTRUCTURAS DE CONTROL --- */
 logica_if
     : IF '(' expresion ')' '{' instrucciones_main '}' lista_elseif else_opt
+      { $$ = { tipo: 'IF', cond: $3, body: $6, elseifs: $8, elseBody: $9 }; }
     ;
 
 lista_elseif
     : lista_elseif ELSE IF '(' expresion ')' '{' instrucciones_main '}'
+      { $1.push({ cond: $5, body: $8 }); $$ = $1; }
     | /* vacío */
+      { $$ = []; }
     ;
 
 else_opt
-    : ELSE '{' instrucciones_main '}'
-    | /* vacío */
+    : ELSE '{' instrucciones_main '}' { $$ = $3; }
+    | /* vacío */                     { $$ = null; }
     ;
 
 logica_switch
     : SWITCH '(' expresion ')' '{' lista_cases default_opt '}'
+      { $$ = { tipo: 'SWITCH', exp: $3, cases: $6, def: $7 }; }
     ;
 
 lista_cases
-    : lista_cases CASE expresion ':' instrucciones_main
-    | CASE expresion ':' instrucciones_main
+    : lista_cases CASE expresion ':' instrucciones_main { $1.push({ val: $3, body: $5 }); $$ = $1; }
+    | CASE expresion ':' instrucciones_main             { $$ = [{ val: $2, body: $4 }]; }
     ;
 
 default_opt
-    : DEFAULT ':' instrucciones_main
-    | /* vacío */
+    : DEFAULT ':' instrucciones_main { $$ = $3; }
+    | /* vacío */                    { $$ = null; }
     ;
 
 logica_while
     : WHILE '(' expresion ')' '{' instrucciones_main '}'
+      { $$ = { tipo: 'WHILE', cond: $3, body: $6 }; }
     ;
 
 logica_do_while
     : DO '{' instrucciones_main '}' WHILE '(' expresion ')' ';'
+      { $$ = { tipo: 'DO_WHILE', cond: $7, body: $3 }; }
     ;
 
 logica_for
     : FOR '(' asignacion_for ';' expresion ';' asignacion_for ')' '{' instrucciones_main '}'
+      { $$ = { tipo: 'FOR', init: $3, cond: $5, inc: $7, body: $10 }; }
     ;
 
-/* --- CORRECCIÓN: El for ahora acepta declaraciones con tipo (ej: int i = 0) --- */
 asignacion_for
-    : tipo IDENTIFICADOR '=' expresion
-    | IDENTIFICADOR '=' expresion
-    | /* vacío */
+    : tipo IDENTIFICADOR '=' expresion { $$ = { tipo: 'DECLARACION', id: $2, exp: $4 }; }
+    | IDENTIFICADOR '=' expresion      { $$ = { tipo: 'ASIGNACION', id: $1, exp: $3 }; }
+    | /* vacío */                      { $$ = null; }
     ;
 
 /* --- EXPRESIONES --- */
 lista_expresiones_opt
-    : lista_expresiones
-    | /* vacío */
+    : lista_expresiones { $$ = $1; }
+    | /* vacío */       { $$ = []; }
     ;
 
 lista_expresiones
-    : lista_expresiones ',' expresion
-    | expresion
+    : lista_expresiones ',' expresion { $1.push($3); $$ = $1; }
+    | expresion                       { $$ = [$1]; }
     ;
 
 expresion
-    : expresion '+' expresion
-    | expresion '-' expresion
-    | expresion '*' expresion
-    | expresion '/' expresion
-    | expresion '%' expresion
-    | expresion '==' expresion
-    | expresion '!=' expresion
-    | expresion '<' expresion
-    | expresion '<=' expresion
-    | expresion '>' expresion
-    | expresion '>=' expresion
-    | expresion '&&' expresion
-    | expresion '||' expresion
-    | '!' expresion
-    | '-' expresion %prec UMINUS
-    | '(' expresion ')'
-    | IDENTIFICADOR
-    | IDENTIFICADOR '[' expresion ']' /* Acceso a arreglos, ej: pokemons[i] */
-    | NUM_INT
-    | NUM_FLOAT
-    | CADENA
-    | CARACTER
-    | TRUE
-    | FALSE
+    : expresion '+' expresion  { $$ = { tipo: 'BINARIA', op: '+', izq: $1, der: $3 }; }
+    | expresion '-' expresion  { $$ = { tipo: 'BINARIA', op: '-', izq: $1, der: $3 }; }
+    | expresion '*' expresion  { $$ = { tipo: 'BINARIA', op: '*', izq: $1, der: $3 }; }
+    | expresion '/' expresion  { $$ = { tipo: 'BINARIA', op: '/', izq: $1, der: $3 }; }
+    | expresion '%' expresion  { $$ = { tipo: 'BINARIA', op: '%', izq: $1, der: $3 }; }
+    | expresion '==' expresion { $$ = { tipo: 'BINARIA', op: '===', izq: $1, der: $3 }; } 
+    | expresion '!=' expresion { $$ = { tipo: 'BINARIA', op: '!==', izq: $1, der: $3 }; }
+    | expresion '<' expresion  { $$ = { tipo: 'BINARIA', op: '<', izq: $1, der: $3 }; }
+    | expresion '<=' expresion { $$ = { tipo: 'BINARIA', op: '<=', izq: $1, der: $3 }; }
+    | expresion '>' expresion  { $$ = { tipo: 'BINARIA', op: '>', izq: $1, der: $3 }; }
+    | expresion '>=' expresion { $$ = { tipo: 'BINARIA', op: '>=', izq: $1, der: $3 }; }
+    | expresion '&&' expresion { $$ = { tipo: 'BINARIA', op: '&&', izq: $1, der: $3 }; }
+    | expresion '||' expresion { $$ = { tipo: 'BINARIA', op: '||', izq: $1, der: $3 }; }
+    | '!' expresion            { $$ = { tipo: 'UNARIA', op: '!', der: $2 }; }
+    | '-' expresion %prec UMINUS { $$ = { tipo: 'UNARIA', op: '-', der: $2 }; }
+    | '(' expresion ')'        { $$ = $2; }
+    | IDENTIFICADOR            { $$ = { tipo: 'ID', val: $1 }; }
+    | IDENTIFICADOR '[' expresion ']' { $$ = { tipo: 'ARREGLO_ACCESO', id: $1, index: $3 }; }
+    | NUM_INT                  { $$ = { tipo: 'NUM', val: $1 }; }
+    | NUM_FLOAT                { $$ = { tipo: 'NUM', val: $1 }; }
+    | CADENA                   { $$ = { tipo: 'CADENA', val: $1.replace(/^"|"$/g, '') }; }
+    | CARACTER                 { $$ = { tipo: 'CHAR', val: $1.replace(/^'|'$/g, '') }; }
+    | TRUE                     { $$ = { tipo: 'BOOL', val: 'True' }; }
+    | FALSE                    { $$ = { tipo: 'BOOL', val: 'False' }; }
     ;

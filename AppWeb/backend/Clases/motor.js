@@ -1,10 +1,11 @@
 const fs = require('fs');
 const path = require('path');
 
-// Importamos los tres traductores
-const TraductorCSS = require('./traductorCSS'); // Asegúrate de que las rutas sean correctas
+// Importamos los traductores
+const TraductorCSS = require('./traductorCSS');
 const TraductorComponentes = require('./traductorComponentes');
-const TraductorDB = require('./traductorDB'); // <-- NUEVO
+const TraductorDB = require('./traductorDB');
+const TraductorPrincipal = require('./traductorPrincipal'); // <-- NUEVO
 
 class Motor {
 
@@ -36,9 +37,14 @@ class Motor {
                 resultado = TraductorComponentes.analizar(contenido);
                 nombreSalida = 'componentesGenerados.js';
 
-            } else if (ext === '.db') { // <-- NUEVA REGLA PARA BASE DE DATOS
+            } else if (ext === '.db') {
                 resultado = TraductorDB.analizar(contenido);
                 nombreSalida = 'consultasGeneradas.sql';
+
+            } else if (ext === '.y') { // <-- NUEVA REGLA PARA EL LENGUAJE PRINCIPAL
+                // Pasamos la rutaEntrada para que pueda resolver las rutas relativas de los imports
+                resultado = TraductorPrincipal.analizar(contenido, rutaEntrada);
+                nombreSalida = 'mainGenerado.js';
 
             } else {
                 throw new Error(`Extensión no soportada: ${ext}`);
@@ -68,9 +74,7 @@ module.exports = Motor;
 // ----------------------
 // PRUEBAS
 // ----------------------
-
 Motor.ejecutar('./entrada.styles');
-
 Motor.ejecutar('./entrada.comp');
-
 Motor.ejecutar('./entrada.db');
+Motor.ejecutar('./entrada.y');
