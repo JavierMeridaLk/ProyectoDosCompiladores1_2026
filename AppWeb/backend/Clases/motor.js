@@ -13,7 +13,7 @@ class Motor {
      * Ejecuta traducción automática según extensión
      */
     static ejecutar(rutaEntrada) {
-        console.log(`🚀 Iniciando proceso de traducción para: ${rutaEntrada}`);
+        console.log(`Iniciando proceso de traducción para: ${rutaEntrada}`);
 
         try {
             if (!fs.existsSync(rutaEntrada)) {
@@ -21,14 +21,13 @@ class Motor {
             }
 
             const contenido = fs.readFileSync(rutaEntrada, 'utf-8');
-            console.log("📄 Archivo leído correctamente.");
+            console.log("Archivo leído correctamente.");
 
             const ext = path.extname(rutaEntrada);
 
             let resultado = "";
             let nombreSalida = "";
 
-            // 🔥 DETECCIÓN AUTOMÁTICA
             if (ext === '.styles') {
                 resultado = TraductorCSS.analizar(contenido);
                 nombreSalida = 'estilosGenerados.css';
@@ -41,8 +40,8 @@ class Motor {
                 resultado = TraductorDB.analizar(contenido);
                 nombreSalida = 'consultasGeneradas.sql';
 
-            } else if (ext === '.y') { // <-- NUEVA REGLA PARA EL LENGUAJE PRINCIPAL
-                // Pasamos la rutaEntrada para que pueda resolver las rutas relativas de los imports
+            } else if (ext === '.y') { 
+
                 resultado = TraductorPrincipal.analizar(contenido, rutaEntrada);
                 nombreSalida = 'mainGenerado.js';
 
@@ -59,17 +58,16 @@ class Motor {
             const rutaSalida = path.join(carpetaSalida, nombreSalida);
             fs.writeFileSync(rutaSalida, resultado);
 
-            console.log(`✅ Traducción exitosa → ${rutaSalida}\n`);
+            console.log(`Traducción exitosa → ${rutaSalida}\n`);
 
         } catch (error) {
-            console.error(`❌ Error en el motor al procesar ${rutaEntrada}:`);
+            console.error(`Error en el motor al procesar ${rutaEntrada}:`);
             console.error(error.message, '\n');
         }
     }
 }
 
 module.exports = Motor;
-
 
 // ----------------------
 // PRUEBAS

@@ -29,21 +29,20 @@ class TraductorCSS {
     static procesarRegla(regla, env, estilosBase) {
         let selector = this.reemplazarVariables(regla.selector, env);
 
-        // 🔥 Convertir a clase CSS si no tiene prefijo
         if (!selector.startsWith('.') && !selector.startsWith('#')) {
             selector = `.${selector}`;
         }
 
         let mapaProps = {};
 
-        // 🔥 HERENCIA (extends) con sobrescritura correcta
+        //HERENCIA 
         if (regla.extends && estilosBase[regla.extends]) {
             estilosBase[regla.extends].forEach(p => {
                 mapaProps[p.propiedad] = p;
             });
         }
 
-        // 🔥 Sobrescribir con propiedades actuales
+        //Sobrescribir con propiedades actuales
         regla.propiedades.forEach(prop => {
             mapaProps[prop.propiedad] = prop;
         });
@@ -138,7 +137,7 @@ class TraductorCSS {
 
     static formatearValor(valor, propiedad, env) {
 
-        // 🔥 RGB estructurado (si el parser lo soporta)
+        // RGB estructurado
         if (typeof valor === 'object' && valor.tipo === 'rgb') {
             const r = this.evaluarExpresion(valor.r, env);
             const g = this.evaluarExpresion(valor.g, env);
@@ -146,7 +145,7 @@ class TraductorCSS {
             return `rgb(${r}, ${g}, ${b})`;
         }
 
-        // 🔥 SHORTHAND border: "3 solid blue"
+        //SHORTHAND border
         if (typeof valor === 'string' && propiedad.includes('border')) {
             const partes = valor.split(' ');
             if (partes.length === 3 && !isNaN(partes[0])) {
@@ -154,7 +153,7 @@ class TraductorCSS {
             }
         }
 
-        // 🔥 Normalización de valores
+        //Normalización de valores
         if (typeof valor === 'string') {
             valor = valor.toLowerCase();
 
@@ -174,7 +173,7 @@ class TraductorCSS {
             if (mapaValores[valor]) return mapaValores[valor];
         }
 
-        // ❌ No agregar px a estos
+        // No agregar px a estos
         const sinUnidad = [
             'color',
             'background-color',
@@ -185,7 +184,7 @@ class TraductorCSS {
 
         if (sinUnidad.some(p => propiedad.includes(p))) return valor;
 
-        // ✔ Agregar px automáticamente
+        // Agregar px 
         if (!isNaN(valor) && !String(valor).includes('%')) {
             return `${valor}px`;
         }

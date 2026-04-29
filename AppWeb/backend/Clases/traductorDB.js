@@ -39,7 +39,6 @@ class TraductorDB {
         nodo.cols.forEach(col => {
             if (typeof col === 'string') {
                 // Caso: TABLE usuarios { nombre, edad } -> No tienen tipo definido
-                // SQLite es flexible, le asignamos TEXT por defecto para evitar errores.
                 definicionColumnas.push(`${col} TEXT`); 
             } else {
                 // Caso: TABLE usuarios COLUMNS nombre=string, edad=int
@@ -70,27 +69,24 @@ class TraductorDB {
     static traducirUpdate(nodo) {
         // Mapeamos las asignaciones al formato: col1 = val1, col2 = val2
         const asignaciones = nodo.data.map(d => `${d.col} = ${d.val}`).join(', ');
-        
-        // REQUERIMIENTO: La condición es obligatoria y siempre compara con el id
         return `UPDATE ${nodo.tabla} SET ${asignaciones} WHERE id = ${nodo.id};`;
     }
 
     static traducirDelete(nodo) {
-        // REQUERIMIENTO: La condición es obligatoria y siempre compara con el id
         return `DELETE FROM ${nodo.tabla} WHERE id = ${nodo.id};`;
     }
 
     // ---------------- HELPERS ----------------
 
     static mapearTipo(tipoLexico) {
-        // SQLite maneja tipos básicos (Afinidad de tipos). 
-        // Convertimos los de tu lenguaje a los que SQLite comprende mejor.
+        // SQLite maneja tipos básicos
+        // Convertimos el lenguaje de conexion a los que SQLite usa
         switch (tipoLexico) {
             case 'int': return 'INTEGER';
             case 'string': return 'TEXT';
             case 'number': 
-            case 'float': return 'REAL'; // REAL es equivalente a double/float
-            case 'boolean': return 'BOOLEAN'; // SQLite usa 1 y 0, pero acepta la palabra clave BOOLEAN
+            case 'float': return 'REAL'; 
+            case 'boolean': return 'BOOLEAN';
             default: return 'TEXT';
         }
     }

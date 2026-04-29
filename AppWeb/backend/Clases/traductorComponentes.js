@@ -56,7 +56,7 @@ ${body}
     // ---------------- HTML ----------------
 
     static generarSection(el) {
-        // Evitamos class="" vacíos si no hay estilos definidos
+
         const clasesAttr = el.estilos && el.estilos.length > 0 
             ? ` class="${el.estilos.join(' ')}"` 
             : '';
@@ -98,7 +98,7 @@ ${f.map(c => `<td>${this.generarElementos(c.contenido)}</td>`).join('\n')}
         const props = this.parseProps(el.props);
 
         let type = "text";
-        // FIX 2: Procesar el valor del input usando procesarTexto para que interpole ${variable}
+        // Procesar el valor del input usando procesarTexto para que interpole ${variable}
         let valorInterpolado = this.procesarTexto(props.value || '');
         let extra = `value="${valorInterpolado}"`;
 
@@ -151,11 +151,11 @@ ${this.generarElementos(el.body)}
     }
 
     static generarSwitch(el) {
-        // FIX 3: Procesar la expresión del switch correctamente
+        // Procesar la expresión del switch correctamente
         const expr = this.expr(el.expr);
 
         let casos = el.cases.map(c => {
-            // FIX 4: Asegurar que los casos de texto lleven comillas en la salida JS
+            //Asegurar que los casos de texto lleven comillas en la salida JS
             let valorCaso = this.valor(c.val);
             if (typeof valorCaso === 'string' && isNaN(valorCaso) && !valorCaso.startsWith('"')) {
                 valorCaso = `"${valorCaso}"`;
@@ -201,13 +201,11 @@ ${def}
 
     static procesarTexto(texto) {
         if (!texto) return '';
-        
         // Limpiamos las comillas literales que vienen del lexer
         let txtLimpio = texto.replace(/^"|"$/g, '');
 
         return txtLimpio
             // FIX 1: Interpola expresiones matemáticas quitando el símbolo $ y evaluando todo.
-            // Ejemplo: `$age + 5` -> ${age + 5}
             .replace(/`([^`]+)`/g, (_, expr) => '${' + expr.replace(/\$/g, '') + '}')
             // Interpola variables simples ($var -> ${var})
             .replace(/\$([a-zA-Z0-9_]+)/g, '${$1}'); 
@@ -241,7 +239,7 @@ ${def}
         props.forEach(p => {
             if (p.id) obj.id = this.valor(p.id);
             if (p.label) obj.label = this.valor(p.label);
-            if (p.value) obj.value = this.valor(p.value); // Aquí nos aseguramos de no limpiar la interpolación antes de tiempo
+            if (p.value) obj.value = this.valor(p.value); 
         });
 
         return obj;

@@ -1,77 +1,13 @@
-dashboard(string $userName, int $age, boolean $isAdmin, array $posts) {
-    
-    <main-container>[
-        
-        // 1. Prueba de Textos, Comillas e Interpolación
-        T("¡Bienvenido al panel de control!")
-        T("Usuario actual: $userName")
-        T("Edad calculada en 5 años: `$age + 5`")
-
-        // 2. Prueba de Condicionales Múltiples (If / Else If / Else)
-        if ($isAdmin) {
-            <admin-alert>[
-                T("Tienes privilegios de administrador.")
-            ]
-        } else if ($age > 18) {
-            T("Eres un usuario estándar mayor de edad.")
-        } else {
-            T("Eres un usuario estándar menor de edad.")
+/* 04-logic.comp */
+statusComp(int $status) {
+    if ($status == 1) {
+        T("Iniciado")
+    } else ($status == 2) {
+        T("En progreso")
+    } else {
+        Switch($status) {
+            case 3 { T("Finalizado") },
+            default { T("Desconocido") }
         }
-
-// 3. Prueba de Tablas y Elementos sin Clase
-        [] // Esto debería generar un div sin class=""
-        
-        [[  // <-- Inicio de la Tabla
-            [[  // <-- Inicio Fila 1
-                [[ T("ID") ]] [[ T("Nombre") ]] [[ T("Rol") ]] 
-            ]]
-            [[  // <-- Inicio Fila 2
-                [[ T("101") ]] [[ T("$userName") ]] [[ T("Admin") ]] 
-            ]]
-        ]]  // <-- Fin de la Tabla
-
-        // 4. Prueba de Imágenes (Sola y Carrusel)
-        IMG("profile.png")
-        IMG("banner1.jpg", "banner2.jpg", "banner3.jpg")
-
-        // 5. Prueba de Bucle For Each
-        <post-list>[
-            for each ($post : $posts) {
-                T("Publicación: $post")
-            }
-        ]
-
-        // 6. Prueba de Formulario y Tipos de Input (Especialmente Checkbox y Labels)
-        FORM {
-            INPUT_TEXT(
-                id: "user_name_input",
-                label: "Nombre de Usuario",
-                value: "$userName"
-            )
-            INPUT_NUMBER(
-                id: "user_age_input",
-                label: "Edad Actual",
-                value: "$age"
-            )
-            INPUT_BOOL(
-                id: "notifications",
-                label: "Recibir notificaciones por correo",
-                value: "true"
-            )
-        }
-
-        // 7. Prueba de Switch-Case
-        switch ($userName) {
-            case "Admin" {
-                T("Modo Dios activado")
-            }
-            case "Juan" {
-                T("Hola Juan, revisa tus mensajes")
-            }
-            default {
-                T("Hola visitante, por favor actualiza tu perfil")
-            }
-        }
-        
-    ]
+    }
 }

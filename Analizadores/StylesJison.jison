@@ -19,7 +19,7 @@
 "to"                                                                    return 'TO';
 "extends"                                                               return 'EXTENDS';
 
-/* PROPIEDADES (Ordenadas de mayor a menor longitud para evitar conflictos en el lexer) 
+/* PROPIEDADES () 
 */
 "background color"                                                      return 'BACKGROUND_COLOR'; 
 "border bottom style"                                                   return 'BORDER_BOTTOM_STYLE';
@@ -129,7 +129,7 @@ definicion_estilo
         { $$ = { tipo: 'REGLA', selector: $1, propiedades: $5, extends: $3 }; }
     ;
 
-/* Permite nombres como .boton-$i */
+
 nombre_clase
     : IDENTIFICADOR 
         { $$ = $1; }

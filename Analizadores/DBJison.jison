@@ -1,6 +1,6 @@
 /* Analizador lexico y sintactico para el lenguaje de DATABASE */
 %{
-    // Opcional: Lógica para manejar la tabla de símbolos de la DB
+
 %}
 
 /* Analizador lexico */
@@ -38,8 +38,8 @@
 "]"                         return ']';
 "("                         return '(';
 ")"                         return ')';
-"{"                         return '{'; /* AGREGADO: Para soportar el archivo de prueba */
-"}"                         return '}'; /* AGREGADO: Para soportar el archivo de prueba */
+"{"                         return '{'; 
+"}"                         return '}'; 
 "+"                         return '+';
 "-"                         return '-';
 "*"                         return '*';
@@ -88,7 +88,7 @@ lista_consultas
     | consulta                 { $$ = [$1]; }
     ;
 
-/* El punto y coma ahora es opcional para mayor flexibilidad en scripts rápidos */
+
 consulta
     : instruccion ';' { $$ = $1; }
     | instruccion     { $$ = $1; }
@@ -102,7 +102,7 @@ instruccion
     | consulta_simple
     ;
 
-/* Soporta TABLE usuarios { id, nombre } y TABLE usuarios COLUMNS id=int */
+
 crear_tabla
     : TABLE IDENTIFICADOR '{' lista_columnas_simple '}' 
         { $$ = {tipo: 'CREATE', tabla: $2, cols: $4}; }
@@ -132,7 +132,6 @@ seleccionar_columna
     : IDENTIFICADOR '.' IDENTIFICADOR { $$ = {tipo: 'SELECT_COL', tabla: $1, col: $3}; }
     ;
 
-/* Para casos como el del test: "usuarios, productos, ventas" */
 consulta_simple
     : IDENTIFICADOR { $$ = {tipo: 'QUERY_SIMPLE', tabla: $1}; }
     ;

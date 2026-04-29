@@ -12,15 +12,15 @@
 
 \s+                         /* ignorar espacios */
 \/\*[\s\S]*?\*\/            /* ignorar comentarios multilínea */
-\/\/.* /* NUEVO: ignorar comentarios de una línea */
+\/\/.* 
 
 /* Tipos de Datos */
 "int"                       return 'INT';
 "string"                    return 'STRING';
 "function"                  return 'FUNCTION';
 "bool"                      return 'BOOL';
-"boolean"                   return 'BOOL';   /* Soporte para boolean */
-"array"                     return 'ARRAY';  /* Soporte para array */
+"boolean"                   return 'BOOL';   
+"array"                     return 'ARRAY';  
 
 /* Componentes Visuales y Formularios */
 "T"                         return 'T';
@@ -45,7 +45,7 @@
 "empty"                     return 'EMPTY';
 "if"                        return 'IF';
 "else"                      return 'ELSE';
-"switch"                    return 'SWITCH'; /* Estándar en minúscula */
+"switch"                    return 'SWITCH'; 
 "Switch"                    return 'SWITCH';
 "case"                      return 'CASE';
 "default"                   return 'DEFAULT';
@@ -99,7 +99,6 @@
 %left '*' '/' '%'
 %right '!'
 %right UMINUS
-/* Resolución del Dangling Else: IF tiene menor precedencia que ELSE */
 %nonassoc IF_SIN_ELSE
 %nonassoc ELSE
 
@@ -136,7 +135,7 @@ parametro
     | tipo VARIABLE      { $$ = {tipo: $1, id: $2}; }
     ;
 
-/* NUEVO: Se añade ARRAY a los tipos permitidos */
+
 tipo : INT | STRING | FUNCTION | BOOL | ARRAY ;
 
 /* --- MANEJO DE ELEMENTOS --- */
@@ -324,7 +323,7 @@ lista_cases
     | caso { $$ = [$1]; }
     ;
 
-/* NUEVO: Reutiliza la regla "valor" para estructurar correctamente el AST */
+
 caso
     : CASE valor '{' elementos '}' ',' { $$ = {val: $2, body: $4}; }
     | CASE valor '{' elementos '}'     { $$ = {val: $2, body: $4}; }

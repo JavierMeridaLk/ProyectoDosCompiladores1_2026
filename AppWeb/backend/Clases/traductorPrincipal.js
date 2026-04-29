@@ -6,7 +6,6 @@ class TraductorPrincipal {
 
     static analizar(input, rutaActual) {
         try {
-            // Asumimos que tu Jison devolverá un objeto con esta estructura:
             // { imports: [], globales: [], funciones: [], main: [] }
             const ast = ParserPrincipal.parse(input);
             return this.generarJS(ast, rutaActual);
@@ -19,22 +18,21 @@ class TraductorPrincipal {
     static generarJS(ast, rutaActual) {
         let jsCode = `// --- ARCHIVO PRINCIPAL GENERADO ---\n\n`;
 
-        // 1. Validar Imports
+        // Validar Imports
         jsCode += this.validarImports(ast.imports, rutaActual);
 
-        // 2. Variables Globales
+        // Variables Globales
         jsCode += `// Variables Globales\n`;
         jsCode += ast.globales.map(g => this.traducirInstruccion(g)).join('\n') + '\n\n';
 
-        // 3. Funciones (execute y load)
+        // Funciones 
         jsCode += `// Funciones de Lógica y DB\n`;
         jsCode += ast.funciones.map(f => this.traducirFuncion(f)).join('\n\n') + '\n\n';
 
-        // 4. MAIN (Orquestador)
-        // Usamos una función autoejecutable o listener para cuando cargue el DOM
+        // MAIN 
         jsCode += `// --- FUNCIÓN PRINCIPAL ---\n`;
         jsCode += `document.addEventListener("DOMContentLoaded", () => {\n`;
-        jsCode += `    let htmlOutput = "";\n\n`; // Aquí acumularemos el HTML de los componentes
+        jsCode += `    let htmlOutput = "";\n\n`;
 
         jsCode += ast.main.map(inst => this.traducirInstruccionMain(inst)).join('\n');
 
@@ -56,7 +54,7 @@ class TraductorPrincipal {
             let rutaRelativa = imp.path.replace(/^"|"$/g, '').trim(); 
             let rutaAbsoluta = path.resolve(path.dirname(rutaActual), rutaRelativa);
 
-            // REQUERIMIENTO: Validar que el archivo exista en tiempo de compilación
+            // Validar que el archivo exista en tiempo de compilación
             if (!fs.existsSync(rutaAbsoluta)) {
                 throw new Error(`Import no encontrado: ${rutaRelativa}`);
             }
@@ -67,7 +65,7 @@ class TraductorPrincipal {
     }
 
     static traducirFuncion(f) {
-        // REQUERIMIENTO: Si hay un error en execute, mostrar alert y detener
+        // Si hay un error en execute, mostrar alert y detener
         const params = f.params ? f.params.map(p => p.id).join(', ') : '';
         let body = f.body.map(inst => {
             if (inst.tipo === 'EXECUTE') {

@@ -1,6 +1,6 @@
 /* Analizador lexico y sintactico del lenguaje principal */
 %{
-    // Opcional: Lógica inicial si la necesitas
+    
 %}
 
 /* Analizador léxico */
@@ -74,7 +74,7 @@
 /* Expresiones Regulares para Valores */
 \"([^\"\\]|\\.)*\"          return 'CADENA';
 \'([^\'\\]|\\.)\'           return 'CARACTER';
-\`([^\`\\]|\\.)*\`          return 'QUERY_SQL';  /* Para el execute */
+\`([^\`\\]|\\.)*\`          return 'QUERY_SQL'; 
 [0-9]+"."[0-9]+\b           return 'NUM_FLOAT';
 [0-9]+\b                    return 'NUM_INT';
 [a-zA-Z_][a-zA-Z0-9_]* return 'IDENTIFICADOR';
@@ -123,16 +123,16 @@ lista_declaraciones
 declaracion
     : tipo IDENTIFICADOR '=' expresion ';'
       { $$ = { tipo: 'DECLARACION', id: $2, exp: $4 }; }
-    /* Declaración sin inicializar (ej. int i;) */
+    /* Declaración sin inicializar */
     | tipo IDENTIFICADOR ';'
       { $$ = { tipo: 'DECLARACION', id: $2, exp: null }; }
-    /* Arreglo vacío con tamaño: int[] arr = [3]; */
+    /* Arreglo vacío con tamaño*/
     | tipo '[' ']' IDENTIFICADOR '=' '[' expresion ']' ';'
       { $$ = { tipo: 'DECLARACION_ARR_VACIO', id: $4, size: $7 }; }
-    /* Arreglo inicializado: string[] arr = {"a", "b"}; */
+    /* Arreglo inicializado */
     | tipo '[' ']' IDENTIFICADOR '=' '{' lista_expresiones '}' ';'
       { $$ = { tipo: 'DECLARACION_ARR_VALORES', id: $4, vals: $7 }; }
-    /* Arreglo por DB: float[] myTeam = execute `query`; */
+    /* Arreglo por DB; */
     | tipo '[' ']' IDENTIFICADOR '=' EXECUTE QUERY_SQL ';'
       { $$ = { tipo: 'DECLARACION_ARR_DB', id: $4, query: $7.replace(/^\`|\`$/g, '') }; }
     ;
@@ -162,7 +162,6 @@ lista_parametros
     | tipo IDENTIFICADOR                      { $$ = [{ tipo: $1, id: $2 }]; }
     ;
 
-/* Las funciones solo pueden ejecutar DB o cargar archivos/variables */
 instrucciones_funcion
     : instrucciones_funcion instruccion_funcion { $1.push($2); $$ = $1; }
     | /* vacío */                               { $$ = []; }

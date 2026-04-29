@@ -1,38 +1,31 @@
-/* Archivo de prueba del lenguaje principal
+/* Test 3: Sistema de Autenticación
+   Evalúa: Declaración de array con DB, While, Break
 */
 
-# import "./misComponentes.comp";
+string[] usuariosDB = execute `SELECT username FROM users`;
+string currentUser = "Misty";
+boolean isLogged = False;
 
-/* Variables globales */
-int contador = 0;
-string saludo = "Bienvenido a la Pokedex";
-boolean cargado = True;
-float[] baseDeDatos = execute `SELECT * FROM pokemons`;
-
-/* Funciones de lógica */
-function recargarApp(int idPokemon) {
-    execute `UPDATE stats SET vistas = vistas + 1 WHERE id = $idPokemon`;
-    load "./index.html";
+function hacerLogin(string user) {
+    execute `INSERT INTO login_logs (usuario) VALUES ($user)`;
+    load "./home.y";
 }
 
-/* Función principal */
 main {
-    @Header(saludo);
+    @AppStyleLoader();
     
-    if (cargado) {
-        @Banner();
+    int i = 0;
+    while (i < 5) {
+        if (usuariosDB[i] == currentUser) {
+            isLogged = True;
+            break;
+        }
+        i = i + 1;
+    }
+
+    if (isLogged) {
+        @Bienvenida(currentUser);
     } else {
-        @Loading();
+        @FormularioLogin(hacerLogin);
     }
-
-    for (int i = 0; i < 5; i = i + 1) {
-        @PokemonCard(i, recargarApp);
-    }
-    
-    while (contador < 2) {
-        @Divisor();
-        contador = contador + 1;
-    }
-
-    @Footer();
 }
