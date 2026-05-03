@@ -1,0 +1,21 @@
+<div class="tabs-bar">
+  <div
+    class="tab"
+    *ngFor="let tab of tabs"
+    [class.active]="tab === activeFile"
+    (click)="selectTab(tab)"
+  >
+    {{ tab }}
+
+    <span class="close-btn"
+      (click)="closeTab(tab); $event.stopPropagation()">
+      ✕
+    </span>
+  </div>
+</div>
+
+<div #editorContainer class="editor-container"></div>
+
+<div class="status-bar">
+  Ln {{ cursorPosition.line }}, Col {{ cursorPosition.column }}
+</div>

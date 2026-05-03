@@ -1,0 +1,73 @@
+.toolbar-content {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 32px;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.menu-actions {
+  display: flex;
+  gap: 16px;
+}
+
+.btn-action {
+  background: transparent;
+  border: none;
+  color: var(--ide-text-main);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.btn-action:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 16px;
+  background: #1e1e1e;
+  color: white;
+}
+
+/* menú */
+.menu {
+  display: flex;
+  gap: 16px;
+}
+
+.menu-item {
+  position: relative; /* 🔥 CLAVE */
+  cursor: pointer;
+}
+
+/* dropdown */
+.dropdown {
+  position: absolute; /* 🔥 CLAVE */
+  top: 100%;
+  left: 0;
+  background: #2d2d2d;
+  border: 1px solid #444;
+  min-width: 180px;
+  z-index: 1000;
+}
+
+.dropdown div {
+  padding: 8px 12px;
+}
+
+.dropdown div:hover {
+  background: #3a3a3a;
+}

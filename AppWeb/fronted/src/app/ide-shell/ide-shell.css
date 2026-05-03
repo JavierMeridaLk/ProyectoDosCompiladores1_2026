@@ -1,0 +1,47 @@
+.ide-container {
+  display: grid;
+  height: 100vh;
+  width: 100vw;
+
+  grid-template-columns: 260px 1fr;
+  grid-template-rows: 40px 1fr 200px;
+
+  grid-template-areas:
+    "header header"
+    "sidebar editor"
+    "sidebar bottom";
+
+  overflow: hidden; /* 🔥 CLAVE */
+}
+
+/* HEADER */
+.ide-header {
+  grid-area: header;
+  border-bottom: 1px solid #2d2d2d;
+  z-index: 10;
+}
+
+/* SIDEBAR */
+.ide-sidebar {
+  grid-area: sidebar;
+  overflow-y: auto;
+  border-right: 1px solid #2d2d2d;
+}
+
+/* EDITOR */
+.ide-editor {
+  grid-area: editor;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden; /* 🔥 CLAVE */
+}
+
+/* TERMINAL */
+.ide-bottom-panel {
+  grid-area: bottom;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 🔥 CLAVE */
+  border-top: 1px solid #2d2d2d;
+}

@@ -1,0 +1,20 @@
+<div class="panel-header">
+  <div class="panel-tab active">Terminal</div>
+</div>
+
+<div class="panel-content">
+
+  <div *ngFor="let line of history" class="terminal-line">
+    {{ line }}
+  </div>
+
+  <div class="terminal-input">
+    <span class="prompt">></span>
+    <input
+      [(ngModel)]="command"
+      (keydown.enter)="execute()"
+      placeholder="Escribe un comando..."
+    />
+  </div>
+
+</div>

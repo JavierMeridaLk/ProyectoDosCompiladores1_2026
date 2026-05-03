@@ -1,0 +1,21 @@
+<div class="sidebar-header">
+  Explorer
+</div>
+
+<div class="file-tree">
+  <ng-container *ngFor="let node of tree">
+    <div class="tree-item" (click)="toggle(node)">
+      {{ node.type === 'folder' ? '📂' : '📄' }} {{ node.name }}
+    </div>
+
+    <div *ngIf="node.isOpen && node.children">
+      <div
+        class="tree-item indent-1"
+        *ngFor="let child of node.children"
+        (click)="toggle(child)"
+      >
+        {{ child.type === 'folder' ? '📂' : '📄' }} {{ child.name }}
+      </div>
+    </div>
+  </ng-container>
+</div>

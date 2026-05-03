@@ -1,0 +1,39 @@
+<div class="toolbar">
+
+  <div class="brand">
+    ⚡ {{ ideName }}
+  </div>
+
+  <div class="menu">
+
+    <!-- ARCHIVO -->
+    <div class="menu-item" (click)="toggle('archivo')">
+      Archivo
+      <div class="dropdown" *ngIf="menus.archivo">
+
+        <div (click)="newFile()">Nuevo archivo</div>
+        <div (click)="newFolder()">Nueva carpeta</div>
+        <div>Cargar proyecto</div>
+        <div>Guardar</div>
+        <div>Guardar todo</div>
+
+      </div>
+    </div>
+
+    <!-- SOLO EJECUTAR -->
+    <div class="menu-item" (click)="run()">
+      Ejecutar
+    </div>
+
+    <!-- SOLO VISTA PREVIA -->
+    <div class="menu-item" (click)="preview()">
+      Vista previa
+    </div>
+
+    <div class="menu-item" (click)="openTerminal()">
+      Nueva terminal
+    </div>
+
+  </div>
+
+</div>
