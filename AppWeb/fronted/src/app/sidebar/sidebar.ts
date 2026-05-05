@@ -1,13 +1,6 @@
-import { Component } from '@angular/core';
+import { Component, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { IdeService } from '../ide.service';
-
-interface FileNode {
-  name: string;
-  type: 'file' | 'folder';
-  isOpen?: boolean;
-  children?: FileNode[];
-}
+import { IdeService, FileNode } from '../ide.service';
 
 @Component({
   selector: 'app-sidebar',
@@ -16,64 +9,72 @@ interface FileNode {
   templateUrl: './sidebar.html',
   styleUrls: ['./sidebar.css'],
 })
-export class Sidebar {
+export class Sidebar implements OnInit {
+
+  tree: FileNode[] = [];
+  rootName = '';
+  rootOpen = true;
+  hasProject = false;
+
+  draggedNode: FileNode | null = null;
 
   constructor(private ide: IdeService) {}
 
-  tree: FileNode[] = [
-    {
-      name: 'src',
-      type: 'folder',
-      isOpen: true,
-      children: [
-        {
-          name: 'index.ts',
-          type: 'file'
-        },
-        {
-          name: 'app.ts',
-          type: 'file'
-        },
-        {
-          name: 'components',
-          type: 'folder',
-          isOpen: false,
-          children: [
-            { name: 'header.ts', type: 'file' }
-          ]
-        }
-      ]
-    }
-  ];
+  ngOnInit() {
+    this.ide.rootName.subscribe(name => this.rootName = name);
+    this.ide.rootOpen.subscribe(open => this.rootOpen = open);
+
+    this.ide.fileTree.subscribe(tree => {
+      this.tree = this.assignDepth(tree, 0);
+    });
+    this.ide.rootName.subscribe(() => {
+      this.hasProject = true;
+    });
+  }
+
+  assignDepth(nodes: FileNode[], depth: number): FileNode[] {
+    return nodes.map(node => ({
+      ...node,
+      depth,
+      children: node.children
+        ? this.assignDepth(node.children, depth + 1)
+        : []
+    }));
+  }
+
+  toggleRoot() {
+    this.rootOpen = !this.rootOpen;
+    this.ide.rootOpen.next(this.rootOpen);
+  }
 
   toggle(node: FileNode) {
     if (node.type === 'folder') {
       node.isOpen = !node.isOpen;
     } else {
-      this.ide.openFile(node.name);
+      this.ide.openFile(node.path);
     }
   }
 
-  addFile() {
-    const name = prompt('Nombre del archivo');
-    if (!name) return;
-
-    this.tree[0].children?.push({
-      name,
-      type: 'file'
-    });
+  async loadProject() {
+    await this.ide.loadProject();
   }
 
-  addFolder() {
-    const name = prompt('Nombre de la carpeta');
-    if (!name) return;
-
-    this.tree[0].children?.push({
-      name,
-      type: 'folder',
-      isOpen: false,
-      children: []
-    });
+  // DRAG
+  onDragStart(node: FileNode) {
+    this.draggedNode = node;
   }
 
+  onDragOver(event: DragEvent) {
+    event.preventDefault();
+  }
+
+  async onDrop(target: FileNode) {
+    if (!this.draggedNode) return;
+
+    if (target.type === 'folder') {
+      await this.ide.moveFile(this.draggedNode, target);
+    }
+
+    this.draggedNode = null;
+  }
 }

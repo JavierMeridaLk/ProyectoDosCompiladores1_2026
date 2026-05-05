@@ -10,17 +10,20 @@ import {
 
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { IdeService } from '../ide.service';
+import { FormsModule } from '@angular/forms';
 
 @Component({
   selector: 'app-editor-space',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './editor-space.html',
   styleUrls: ['./editor-space.css'],
+  
 })
 export class EditorSpace implements AfterViewInit, OnInit {
 
   @ViewChild('editorContainer', { static: true }) container!: ElementRef;
+  @ViewChild('colorPicker') colorPicker!: ElementRef<HTMLInputElement>;
 
   private isBrowser: boolean;
   editor: any;
@@ -29,6 +32,9 @@ export class EditorSpace implements AfterViewInit, OnInit {
   activeFile: string = '';
 
   cursorPosition = { line: 1, column: 1 };
+
+  selectedColor: string = '#ffffff';
+  format: 'hex' | 'rgb' = 'hex';
 
   constructor(
     private ide: IdeService,
@@ -64,7 +70,6 @@ export class EditorSpace implements AfterViewInit, OnInit {
       language: 'typescript',
       theme: 'vs-dark',
       automaticLayout: true,
-
       quickSuggestions: false,
       suggestOnTriggerCharacters: false,
       parameterHints: { enabled: false },
@@ -78,7 +83,13 @@ export class EditorSpace implements AfterViewInit, OnInit {
         column: e.position.column
       };
     });
+
+    this.editor.onDidChangeModelContent(() => {
+      if (!this.activeFile) return;
+      this.ide.updateFileContent(this.activeFile, this.editor.getValue());
+    });
   }
+
 
   selectTab(file: string) {
     this.ide.openFile(file);
@@ -86,5 +97,60 @@ export class EditorSpace implements AfterViewInit, OnInit {
 
   closeTab(file: string) {
     this.ide.closeFile(file);
+  }
+
+  // ABRIR SELECTOR
+  openColorPicker() {
+    this.colorPicker.nativeElement.click();
+  }
+
+  // GUARDAR COLOR (NO INSERTA)
+  onColorSelected(event: any) {
+    this.selectedColor = event.target.value;
+  }
+
+  // OBTENER VALOR FINAL
+  getFormattedColor(): string {
+    return this.format === 'hex'
+      ? this.selectedColor
+      : this.hexToRgb(this.selectedColor);
+  }
+
+  // INSERTAR CUANDO USUARIO QUIERA
+  insertColor() {
+    const value = this.getFormattedColor();
+    this.insertAtCursor(value);
+  }
+
+  // COPIAR
+  copyColor() {
+    const value = this.getFormattedColor();
+    navigator.clipboard.writeText(value);
+  }
+
+  // INSERTAR EN CURSOR
+  insertAtCursor(text: string) {
+    if (!this.editor) return;
+
+    const selection = this.editor.getSelection();
+
+    this.editor.executeEdits('', [
+      {
+        range: selection,
+        text,
+        forceMoveMarkers: true
+      }
+    ]);
+
+    this.editor.focus();
+  }
+
+  // HEX → RGB
+  hexToRgb(hex: string): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+
+    return `rgb(${r},${g},${b})`;
   }
 }

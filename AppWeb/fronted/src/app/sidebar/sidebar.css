@@ -26,9 +26,19 @@
   background-color: #2a2d2e;
 }
 
+.tree-item.drag-over {
+  border: 1px dashed #4ec9b0;
+}
+
 .tree-item.active {
   background-color: #37373d;
   color: #ffffff;
+}
+
+.tree-item.root {
+  font-weight: bold;
+  color: #ffffff;
+  background-color: #2a2d2e;
 }
 
 .arrow {

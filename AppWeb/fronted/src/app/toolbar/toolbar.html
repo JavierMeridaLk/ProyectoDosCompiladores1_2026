@@ -1,35 +1,45 @@
 <div class="toolbar">
 
   <div class="brand">
-    ⚡ {{ ideName }}
+    <img src="/assets/logo.png" width="20" />
+    {{ ideName }}
   </div>
 
   <div class="menu">
 
     <!-- ARCHIVO -->
-    <div class="menu-item" (click)="toggle('archivo')">
+    <div class="menu-item" (click)="toggle('archivo'); $event.stopPropagation()">
       Archivo
+
       <div class="dropdown" *ngIf="menus.archivo">
 
-        <div (click)="newFile()">Nuevo archivo</div>
-        <div (click)="newFolder()">Nueva carpeta</div>
-        <div>Cargar proyecto</div>
-        <div>Guardar</div>
-        <div>Guardar todo</div>
+        <div (click)="newFile(); closeAll()">📄 Nuevo archivo</div>
+        <div (click)="newFolder(); closeAll()">📁 Nueva carpeta</div>
+
+        <hr />
+
+        <div (click)="newProject(); closeAll()">📁Nuevo proyecto</div>
+        <div (click)="loadProject(); closeAll()">📂 Cargar proyecto</div>
+
+        <hr />
+
+        <div (click)="save(); closeAll()">💾 Guardar</div>
+        <div (click)="saveAll(); closeAll()">💾 Guardar todo</div>
 
       </div>
     </div>
 
-    <!-- SOLO EJECUTAR -->
+    <!-- EJECUTAR -->
     <div class="menu-item" (click)="run()">
       Ejecutar
     </div>
 
-    <!-- SOLO VISTA PREVIA -->
+    <!-- VISTA PREVIA -->
     <div class="menu-item" (click)="preview()">
       Vista previa
     </div>
 
+    <!-- TERMINAL -->
     <div class="menu-item" (click)="openTerminal()">
       Nueva terminal
     </div>
