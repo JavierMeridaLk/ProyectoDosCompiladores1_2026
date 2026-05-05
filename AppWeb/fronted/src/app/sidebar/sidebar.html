@@ -22,20 +22,19 @@
 
   <div *ngFor="let node of nodes">
 
-    <div
-      class="tree-item"
-      [class.folder]="node.type === 'folder'"
-      [style.padding-left.px]="node.depth * 16"
-      draggable="true"
-      (dragstart)="onDragStart(node)"
-      (dragover)="onDragOver($event)"
-      (drop)="onDrop(node)"
-      (click)="toggle(node)"
-    >
-      {{ node.type === 'folder'
-          ? (node.isOpen ? '📂' : '📁')
-          : '📄' }}
-      {{ node.name }}
+    <div class="tree-item"
+        [class.folder]="node.type === 'folder'"
+        [class.file]="node.type === 'file'"
+        (click)="toggle(node)"
+        draggable="true"
+        (dragstart)="onDragStart(node)"
+        (dragover)="onDragOver($event)"
+        (drop)="onDrop(node)"
+        [style.padding-left.px]="node.depth * 16">
+
+      <span class="icon">{{ getIcon(node) }}</span>
+      <span class="name">{{ node.name }}</span>
+
     </div>
 
     <div *ngIf="node.type === 'folder' && node.isOpen">

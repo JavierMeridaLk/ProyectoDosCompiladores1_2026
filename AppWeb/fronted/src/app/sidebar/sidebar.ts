@@ -77,4 +77,26 @@ export class Sidebar implements OnInit {
 
     this.draggedNode = null;
   }
+
+  getIcon(node: any): string {
+  if (node.type === 'folder') {
+    return node.isOpen ? '📂' : '📁';
+  }
+
+  // EXTENSIONES
+  if (node.name.endsWith('.y')) {
+    return '🧠'; // lógica principal
+  }
+
+  if (node.name.endsWith('.comp')) {
+    return '🧩'; // componentes
+  }
+
+  if (node.name.endsWith('.styles')) {
+    return '🎨'; // estilos
+  }
+
+  return '📄'; // default
+}
+
 }

@@ -13,17 +13,18 @@
 }
 
 .tree-item {
-  padding: 4px 16px;
-  cursor: pointer;
   display: flex;
   align-items: center;
   gap: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
   user-select: none;
-  white-space: nowrap;
+  border-radius: 4px;
+  font-size: 13px;
 }
 
 .tree-item:hover {
-  background-color: #2a2d2e;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .tree-item.drag-over {
@@ -46,6 +47,21 @@
   color: #888;
   width: 12px;
   display: inline-block;
+}
+
+.tree-item.folder {
+  font-weight: 500;
+}
+
+.icon {
+  width: 18px;
+  text-align: center;
+}
+
+.name {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Niveles de indentación */
