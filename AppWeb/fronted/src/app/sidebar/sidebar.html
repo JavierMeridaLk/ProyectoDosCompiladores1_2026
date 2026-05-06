@@ -10,10 +10,9 @@
 <div class="file-tree">
 
   <div *ngIf="rootOpen">
-
-    <ng-container *ngTemplateOutlet="recursive; context:{ $implicit: tree }">
+    <ng-container 
+      *ngTemplateOutlet="recursive; context:{ $implicit: tree }">
     </ng-container>
-
   </div>
 
 </div>
@@ -23,17 +22,21 @@
   <div *ngFor="let node of nodes">
 
     <div class="tree-item"
-        [class.folder]="node.type === 'folder'"
-        [class.file]="node.type === 'file'"
-        (click)="toggle(node)"
-        draggable="true"
-        (dragstart)="onDragStart(node)"
-        (dragover)="onDragOver($event)"
-        (drop)="onDrop(node)"
-        [style.padding-left.px]="node.depth * 16">
+      [style.padding-left.px]="node.depth * 16"
+      draggable="true"
+      (dragstart)="onDragStart(node)"
+      (dragover)="onDragOver($event)"
+      (drop)="onDrop(node)">
 
-      <span class="icon">{{ getIcon(node) }}</span>
-      <span class="name">{{ node.name }}</span>
+      <span (click)="toggle(node)">
+        {{ getIcon(node) }} {{ node.name }}
+      </span>
+
+    <span class="actions">
+      <button *ngIf="node.type === 'folder'" (click)="createFile(node, $event)">📄</button>
+      <button *ngIf="node.type === 'folder'" (click)="createFolder(node, $event)">📁</button>
+      <button (click)="delete(node, $event)">🗑</button>
+    </span>
 
     </div>
 

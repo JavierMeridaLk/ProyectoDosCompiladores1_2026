@@ -19,9 +19,6 @@ export class BottomPanel {
 
     this.history.push('> ' + this.command);
 
-    // ❌ eliminado "command not found"
-    // puedes agregar lógica aquí después
-
     this.command = '';
   }
 }

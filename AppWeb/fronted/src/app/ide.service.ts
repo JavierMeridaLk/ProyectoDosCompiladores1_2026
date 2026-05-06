@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
+import { NotificationService } from './notification.service';
 
 export interface FileNode {
   name: string;
@@ -14,9 +15,10 @@ export interface FileNode {
 @Injectable({ providedIn: 'root' })
 export class IdeService {
 
+  constructor(private notify: NotificationService) {}
+
   rootHandle: any = null;
 
-  // 🔥 ROOT separado
   rootName = new BehaviorSubject<string>('');
   rootOpen = new BehaviorSubject<boolean>(true);
 
@@ -28,16 +30,67 @@ export class IdeService {
   fileContents: Record<string, string> = {};
   savedFileContents: Record<string, string> = {};
 
+  dirtyFiles = new BehaviorSubject<Set<string>>(new Set());
+
+  terminalOpen = new BehaviorSubject<boolean>(true);
+
   // =========================
   // 📁 CARGAR PROYECTO
   // =========================
   async loadProject() {
-    this.rootHandle = await (window as any).showDirectoryPicker();
+    try {
+      this.rootHandle = await (window as any).showDirectoryPicker();
 
-    const children = await this.readDirectory(this.rootHandle, this.rootHandle.name);
+      this.resetState();
 
-    this.rootName.next(this.rootHandle.name);
-    this.fileTree.next(children);
+      const children = await this.readDirectory(
+        this.rootHandle,
+        this.rootHandle.name
+      );
+
+      this.rootName.next(this.rootHandle.name);
+      this.fileTree.next([...children]);
+
+      this.notify.success('Proyecto cargado correctamente');
+    } catch (e) {
+      this.notify.error('Error al cargar proyecto');
+    }
+  }
+
+  // =========================
+  // 🆕 NUEVO PROYECTO
+  // =========================
+  async newProject(name: string) {
+    try {
+      const root = await (window as any).showDirectoryPicker();
+
+      const projectHandle = await root.getDirectoryHandle(name, { create: true });
+
+      this.rootHandle = projectHandle;
+
+      this.resetState();
+
+      const children = await this.readDirectory(projectHandle, name);
+
+      this.rootName.next(name);
+      this.fileTree.next([...children]);
+
+      this.notify.success(`Proyecto "${name}" creado`);
+    } catch (e) {
+      this.notify.error('Error creando proyecto');
+    }
+  }
+
+  // =========================
+  // 🔄 RESET GLOBAL
+  // =========================
+  resetState() {
+    this.fileHandles = {};
+    this.fileContents = {};
+    this.savedFileContents = {};
+    this.openFiles.next([]);
+    this.activeFile.next(null);
+    this.dirtyFiles.next(new Set());
   }
 
   // =========================
@@ -92,6 +145,8 @@ export class IdeService {
     }
 
     this.activeFile.next(path);
+
+    this.notify.info(`Archivo abierto`);
   }
 
   getFileContent(path: string): string {
@@ -117,16 +172,32 @@ export class IdeService {
     const handle = this.fileHandles[path];
     if (!handle) return;
 
-    const writable = await handle.createWritable();
-    await writable.write(this.fileContents[path]);
-    await writable.close();
+    try {
+      const writable = await handle.createWritable();
+      await writable.write(this.fileContents[path]);
+      await writable.close();
 
-    this.savedFileContents[path] = this.fileContents[path];
+      this.savedFileContents[path] = this.fileContents[path];
+
+      const dirty = new Set(this.dirtyFiles.value);
+      dirty.delete(path);
+      this.dirtyFiles.next(dirty);
+
+      this.notify.success(`Archivo guardado`);
+    } catch (e) {
+      this.notify.error(`Error guardando archivo`);
+    }
   }
 
   async saveAll() {
-    for (const file of this.openFiles.value) {
-      await this.saveFile(file);
+    try {
+      for (const file of this.openFiles.value) {
+        await this.saveFile(file);
+      }
+
+      this.notify.success('Todos los archivos guardados');
+    } catch (e) {
+      this.notify.error('Error guardando archivos');
     }
   }
 
@@ -146,22 +217,61 @@ export class IdeService {
     if (!this.rootHandle) return;
 
     await this.rootHandle.getFileHandle(name, { create: true });
+
     await this.refreshTree();
+
+    this.notify.success(`Archivo creado`);
   }
 
   async createFolder(name: string) {
     if (!this.rootHandle) return;
 
     await this.rootHandle.getDirectoryHandle(name, { create: true });
+
     await this.refreshTree();
+
+    this.notify.success(`Carpeta creada`);
+  }
+
+  async createFileInFolder(folderPath: string, name: string) {
+    const dir = await this.getDirectoryFromPath(folderPath);
+
+    const fileHandle = await dir.getFileHandle(name, { create: true });
+
+    const fullPath = `${folderPath}/${name}`;
+
+    this.fileHandles[fullPath] = fileHandle;
+    this.fileContents[fullPath] = '';
+
+    await this.refreshTree();
+
+    this.notify.success(`Archivo creado`);
+  }
+
+  async createFolderInFolder(folderPath: string, name: string) {
+    const dir = await this.getDirectoryFromPath(folderPath);
+
+    await dir.getDirectoryHandle(name, { create: true });
+
+    await this.refreshTree();
+
+    this.notify.success(`Carpeta creada`);
   }
 
   // =========================
   // 🔄 REFRESCAR
   // =========================
   async refreshTree() {
-    const children = await this.readDirectory(this.rootHandle, this.rootHandle.name);
-    this.fileTree.next(children);
+    if (!this.rootHandle) return;
+
+    this.fileHandles = {};
+
+    const children = await this.readDirectory(
+      this.rootHandle,
+      this.rootHandle.name
+    );
+
+    this.fileTree.next([...children]);
   }
 
   // =========================
@@ -188,6 +298,8 @@ export class IdeService {
     delete this.fileHandles[fileNode.path];
 
     await this.refreshTree();
+
+    this.notify.success(`Archivo movido`);
   }
 
   async deleteFile(path: string) {
@@ -196,33 +308,71 @@ export class IdeService {
 
     let dir = this.rootHandle;
 
-    for (const part of parts.slice(1)) {
+    if (parts[0] === this.rootHandle.name) {
+      parts.shift();
+    }
+
+    for (const part of parts) {
       dir = await dir.getDirectoryHandle(part);
     }
 
     await dir.removeEntry(fileName);
+
+    this.notify.success(`Archivo eliminado`);
   }
 
-  terminalOpen = new BehaviorSubject<boolean>(true);
+  async getDirectoryFromPath(path: string): Promise<any> {
+    const parts = path.split('/');
+
+    let current = this.rootHandle;
+
+    if (parts[0] === this.rootHandle.name) {
+      parts.shift();
+    }
+
+    for (const part of parts) {
+      current = await current.getDirectoryHandle(part);
+    }
+
+    return current;
+  }
 
   toggleTerminal() {
     this.terminalOpen.next(!this.terminalOpen.value);
   }
 
-  async newProject(name: string) {
-    const root = await (window as any).showDirectoryPicker();
+  async deleteNode(node: FileNode) {
+    if (!this.rootHandle) return;
 
-    const projectHandle = await root.getDirectoryHandle(name, { create: true });
+    try {
+      const parts = node.path.split('/');
+      const name = parts.pop();
 
-    this.rootHandle = projectHandle;
+      let dir = this.rootHandle;
 
-    const children = await this.readDirectory(projectHandle, name);
+      if (parts[0] === this.rootHandle.name) {
+        parts.shift();
+      }
 
-    this.rootName.next(name);
-    this.fileTree.next(children);
+      for (const part of parts) {
+        dir = await dir.getDirectoryHandle(part);
+      }
+
+      await dir.removeEntry(name, { recursive: true });
+
+      delete this.fileHandles[node.path];
+      delete this.fileContents[node.path];
+      delete this.savedFileContents[node.path];
+
+      this.closeFile(node.path);
+
+      await this.refreshTree();
+
+      this.notify.success(`Eliminado correctamente`);
+
+    } catch (err) {
+      console.error('Error eliminando:', err);
+      this.notify.error('Error eliminando');
+    }
   }
-
-  dirtyFiles = new BehaviorSubject<Set<string>>(new Set());
-
-
 }

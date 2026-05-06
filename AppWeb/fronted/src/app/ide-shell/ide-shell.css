@@ -11,7 +11,7 @@
     "sidebar editor"
     "sidebar bottom";
 
-  overflow: hidden; /* 🔥 CLAVE */
+  overflow: hidden; 
 }
 
 /* HEADER */
@@ -34,7 +34,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  overflow: hidden; /* 🔥 CLAVE */
+  overflow: hidden; 
 }
 
 /* TERMINAL */
@@ -42,6 +42,6 @@
   grid-area: bottom;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 🔥 CLAVE */
+  overflow: hidden; 
   border-top: 1px solid #2d2d2d;
 }

@@ -49,7 +49,7 @@
 }
 
 .menu-item {
-  position: relative; /* 🔥 CLAVE */
+  position: relative; 
   cursor: pointer;
 }
 

@@ -25,7 +25,7 @@ export class Toolbar {
     this.menus.archivo = false;
   }
 
-  // 🔥 SOLO LLAMA AL SERVICE
+
   async newProject() {
     const name = prompt('Nombre del proyecto');
     if (!name) return;

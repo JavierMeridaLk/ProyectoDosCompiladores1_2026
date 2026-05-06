@@ -64,6 +64,24 @@
   text-overflow: ellipsis;
 }
 
+.actions {
+  margin-left: auto;
+  display: flex;
+  gap: 4px;
+}
+
+.actions button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.6;
+}
+
+.actions button:hover {
+  opacity: 1;
+}
+
 /* Niveles de indentación */
 .indent-1 { padding-left: 24px; }
 .indent-2 { padding-left: 36px; }

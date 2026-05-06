@@ -99,4 +99,32 @@ export class Sidebar implements OnInit {
   return '📄'; // default
 }
 
+async createFile(node: any, event: Event) {
+  event.stopPropagation();
+
+  const name = prompt('Nombre del archivo');
+  if (!name) return;
+
+  await this.ide.createFileInFolder(node.path, name);
+}
+
+async createFolder(node: any, event: Event) {
+  event.stopPropagation();
+
+  const name = prompt('Nombre de la carpeta');
+  if (!name) return;
+
+  await this.ide.createFolderInFolder(node.path, name);
+}
+
+async delete(node: FileNode, event: Event) {
+  event.stopPropagation();
+
+  const confirmDelete = confirm(`¿Eliminar "${node.name}"?`);
+
+  if (!confirmDelete) return;
+
+  await this.ide.deleteNode(node);
+}
+
 }
