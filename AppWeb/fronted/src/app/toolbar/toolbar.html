@@ -11,25 +11,28 @@
     <div class="menu-item" (click)="toggle('archivo'); $event.stopPropagation()">
       Archivo
 
-      <div class="dropdown" *ngIf="menus.archivo">
+      @if (menus.archivo) {
+        <div class="dropdown">
 
-        <div (click)="newFile(); closeAll()">📄 Nuevo archivo</div>
-        <div (click)="newFolder(); closeAll()">📁 Nueva carpeta</div>
+          <div (click)="newFile(); closeAll()">Nuevo archivo</div>
+          <div (click)="newFolder(); closeAll()">Nueva carpeta</div>
 
-        <hr />
+          <hr />
 
-        <div (click)="newProject(); closeAll()">📁 Nuevo proyecto</div>
-        <div (click)="loadProject(); closeAll()">📂 Cargar proyecto</div>
+          <div (click)="newProject(); closeAll()">Nuevo proyecto</div>
+          <div (click)="loadProject(); closeAll()">Cargar proyecto</div>
 
-        <hr />
+          <hr />
 
-        <div (click)="save(); closeAll()">💾 Guardar</div>
-        <div (click)="saveAll(); closeAll()">💾 Guardar todo</div>
+          <div (click)="save(); closeAll()">Guardar</div>
+          <div (click)="saveAll(); closeAll()">Guardar todo</div>
 
-        <hr />
-        <div (click)="exportToZip(); closeAll()">📦 Exportar (.zip)</div>
+          <hr />
 
-      </div>
+          <div (click)="export(); closeAll()">Exportar a producción</div>
+
+        </div>
+      }
     </div>
 
     <!-- EJECUTAR -->

@@ -5,8 +5,10 @@ import { IdeService } from '../ide.service';
 import { ApiService, DbRow, CompileError } from '../api.service';
 
 interface DbEntry {
-  query: string;
+  query: string;           // lo que escribió el usuario
+  sql?: string;            // SQL generado por el traductor
   rows: DbRow[];
+  errores?: { tipo: string; descripcion: string; linea: number; columna: number }[];
   error?: string;
 }
 
@@ -18,6 +20,7 @@ interface DbEntry {
   styleUrls: ['./bottom-panel.css'],
 })
 export class BottomPanel implements OnInit, AfterViewChecked {
+
   @ViewChild('terminalScroll') terminalScroll!: ElementRef;
 
   activeTab: 'terminal' | 'errores' = 'terminal';
@@ -53,14 +56,24 @@ export class BottomPanel implements OnInit, AfterViewChecked {
     this.dbLoading = true;
     this.dbCommand = '';
 
-    const res = await this.api.executeQuery(query);
-    this.dbHistory.push({
-      query,
-      rows:  res.ok ? (res.rows ?? []) : [],
-      error: res.ok ? undefined : res.error,
-    });
-
-    this.dbLoading = false;
+    try {
+      const res = await this.api.executeDbTerminal(query);
+      this.dbHistory.push({
+        query,
+        sql:    res.sql,
+        rows:   res.ok ? (res.rows ?? []) : [],
+        errores: res.errores?.length ? res.errores : undefined,
+        error:   res.ok ? undefined : res.error,
+      });
+    } catch (e: any) {
+      this.dbHistory.push({
+        query,
+        rows:  [],
+        error: e?.message ?? 'Error de conexión con el servidor',
+      });
+    } finally {
+      this.dbLoading = false;
+    }
   }
 
   clearDb() {

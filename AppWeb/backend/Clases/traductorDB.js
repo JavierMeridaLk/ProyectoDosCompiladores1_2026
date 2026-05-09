@@ -60,9 +60,10 @@ class TraductorDB {
      * @returns {{ sql: string, errores: ErrorLSS[], resultado?: any }}
      */
     static async analizar(entrada, ejecutar = false) {
-        ParserDB.yy = { errores: [] };
-        ParserDB.yy.parseError = function(msg, hash) {
-            ParserDB.yy.errores.push({
+        const parserObj = ParserDB.parser;
+        parserObj.yy = { errores: [] };
+        parserObj.yy.parseError = function(msg, hash) {
+            parserObj.yy.errores.push({
                 tipo: 'Sintáctico',
                 descripcion: msg,
                 linea: hash?.loc?.first_line ?? 0,
@@ -77,7 +78,7 @@ class TraductorDB {
         try {
             const resultado = ParserDB.parse(entrada);
             ast             = resultado?.ast ?? [];
-            const rawErrs   = ParserDB.yy.errores ?? [];
+            const rawErrs   = parserObj.yy.errores ?? [];
 
             rawErrs.forEach(e => {
                 errores.push(new ErrorLSS(
@@ -124,7 +125,14 @@ class TraductorDB {
             }
         }
 
-        return { sql, errores };
+        const tablaSimbolos = {
+            tablas: [...entorno.tablas.entries()].map(([nombre, cols]) => ({
+                nombre,
+                columnas: [...cols.entries()].map(([col, tipo]) => ({ col, tipo }))
+            }))
+        };
+
+        return { sql, errores, tablaSimbolos };
     }
 
     /* ── Despacho por tipo de nodo ── */

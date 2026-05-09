@@ -9,10 +9,11 @@
 
 \s+                             /* ignorar espacios y saltos de línea */
 \/\*[\s\S]*?\*\/               /* ignorar comentarios multilínea */
-\/\/.*                         /* ignorar comentarios de línea */
+\/\/.* /* ignorar comentarios de línea */
 
 /* ── Tipos de datos ── */
 "int"                           return 'INT';
+"float"                         return 'FLOAT';
 "string"                        return 'STRING';
 "function"                      return 'FUNCTION';
 "bool"                          return 'BOOL';
@@ -79,20 +80,20 @@
 
 /* ── Literales ── */
 \"([^\"\\]|\\.)*\"              return 'CADENA';
-\`[^\`]*\`                                  return 'CADENA_EXPR';
+\`[^\`]*\`                      return 'CADENA_EXPR';
 
 /* ── Variables y referencias ── */
-"$"[a-zA-Z0-9_]+\[\"[^\"]*\"\]              return 'VARIABLE';
-"$"[a-zA-Z0-9_]+\[[0-9]+\]                 return 'VARIABLE';
-"$"[a-zA-Z0-9_]+                           return 'VARIABLE';
-"@"[a-zA-Z0-9_]+               return 'REF_ID';
+"$"[a-zA-Z0-9_]+\[\"[^\"]*\"\]  return 'VARIABLE';
+"$"[a-zA-Z0-9_]+\[[0-9]+\]      return 'VARIABLE';
+"$"[a-zA-Z0-9_]+                return 'VARIABLE';
+"@"[a-zA-Z0-9_]+                return 'REF_ID';
 
 /* ── Números ── */
-[0-9]+"."[0-9]+                             return 'NUMERO';
-[0-9]+                                      return 'NUMERO';
+[0-9]+"."[0-9]+                 return 'NUMERO';
+[0-9]+                          return 'NUMERO';
 
-/* ── Identificadores (incluye guión para nombres de estilos) ── */
-[a-zA-Z_][a-zA-Z0-9_-]*        return 'IDENTIFICADOR';
+/* ── Identificadores (incluye guión para nombres y estilos) ── */
+[a-zA-Z_-][a-zA-Z0-9_-]* return 'IDENTIFICADOR';
 
 <<EOF>>                         return 'EOF';
 
@@ -187,9 +188,10 @@ parametro
     | tipo VARIABLE      { $$ = { tipo: $1, id: $2, linea: @2.first_line }; }
     ;
 
-/* cada alternativa tiene su propia acción { $$ = $1; } */
+/* Tipos soportados */
 tipo
     : INT      { $$ = 'int'; }
+    | FLOAT    { $$ = 'float'; }
     | STRING   { $$ = 'string'; }
     | FUNCTION { $$ = 'function'; }
     | BOOL     { $$ = 'bool'; }
@@ -222,6 +224,7 @@ elemento
     | logica_for    { $$ = $1; }
     | logica_if     { $$ = $1; }
     | logica_switch { $$ = $1; }
+    | llamada_comp  { $$ = $1; }
     | error '}'
         {
             yy.errores.push({
@@ -232,6 +235,22 @@ elemento
             });
             $$ = null;
         }
+    ;
+
+/* ── Llamada a otros componentes (ej: BadgeTipo($tipo)) ── */
+llamada_comp
+    : IDENTIFICADOR '(' lista_args_opt ')'
+        { $$ = { tipo: 'LLAMADA_COMPONENTE', id: $1, args: $3, linea: @1.first_line }; }
+    ;
+
+lista_args_opt
+    : lista_valores { $$ = $1; }
+    | /* vacío */   { $$ = []; }
+    ;
+
+lista_valores
+    : lista_valores ',' valor { $1.push($3); $$ = $1; }
+    | valor                   { $$ = [$1]; }
     ;
 
 /* ── Lista de ids de estilos (siempre con '<' '>') ── */
@@ -448,7 +467,7 @@ logica_for
             $$ = {
                 tipo: 'FOR_TRACK',
                 vars: $3,
-                trackVar: $6,   /* variable de índice, ej: $index */
+                trackVar: $6,
                 body: $8,
                 empty: $10,
                 linea: @1.first_line
@@ -499,21 +518,23 @@ logica_if
     ;
 
 cadena_else
-    : ELSE '(' expresion ')' '{' elementos '}' %prec IF_SIN_ELSE
-        { $$ = { tipo: 'ELSE_IF', cond: $3, body: $6, sino: null }; }
-    | ELSE '(' expresion ')' '{' elementos '}' cadena_else
-        { $$ = { tipo: 'ELSE_IF', cond: $3, body: $6, sino: $8  }; }
+    /* Soporte para else if anidados */
+    : ELSE IF '(' expresion ')' '{' elementos '}' cadena_else
+        { $$ = { tipo: 'ELSE_IF', cond: $4, body: $7, sino: $9, linea: @1.first_line }; }
+    
+    /* Soporte para else if final (sin else) */
+    | ELSE IF '(' expresion ')' '{' elementos '}' %prec IF_SIN_ELSE
+        { $$ = { tipo: 'ELSE_IF', cond: $4, body: $7, sino: null, linea: @1.first_line }; }
+    
+    /* Soporte para el else por defecto */
     | ELSE '{' elementos '}'
-        { $$ = { tipo: 'ELSE', body: $3 }; }
+        { $$ = { tipo: 'ELSE', body: $3, linea: @1.first_line }; }
     ;
 
 /* ── Switch ── */
 logica_switch
-    : SWITCH '(' expr_switch ')' '{' lista_cases default_opt '}'
-        { $$ = { tipo: 'SWITCH', expr: $3, cases: $6, def: $7, linea: @1.first_line }; }
-    | SWITCH '(' expr_switch ')' '{' default_opt '}'
-        { $$ = { tipo: 'SWITCH', expr: $3, cases: [], def: $6, linea: @1.first_line }; }
-    /* Recuperación */
+    : SWITCH '(' expresion ')' '{' lista_casos default_opt '}'
+        { $$ = { tipo: 'SWITCH', cond: $3, casos: $6, def: $7, linea: @1.first_line }; }
     | SWITCH error '}'
         {
             yy.errores.push({
@@ -526,29 +547,22 @@ logica_switch
         }
     ;
 
-expr_switch
-    : VARIABLE
-        { $$ = { tipo: 'VAR', val: $1 }; }
-    | VARIABLE '[' NUMERO ']'
-        { $$ = { tipo: 'VAR_IDX', val: $1, index: Number($3) }; }
-    | VARIABLE '[' CADENA ']'
-        { $$ = { tipo: 'VAR_IDX', val: $1, index: $3 }; }
+lista_casos
+    : lista_casos ',' caso { $1.push($3); $$ = $1; }
+    | lista_casos caso     { $1.push($2); $$ = $1; } /* Soporta casos sin coma separadora si se olvida */
+    | caso                 { $$ = [$1]; }
     ;
 
-lista_cases
-    : lista_cases caso { $1.push($2); $$ = $1; }
-    | caso             { $$ = [$1]; }
-    ;
-
-/* Coma al final del case es opcional según especificación */
 caso
-    : CASE valor '{' elementos '}' ','
-        { $$ = { val: $2, body: $4, linea: @1.first_line }; }
-    | CASE valor '{' elementos '}'
-        { $$ = { val: $2, body: $4, linea: @1.first_line }; }
+    : CASE valor '{' elementos '}'
+        { $$ = { tipo: 'CASE', valor: $2, body: $4, linea: @1.first_line }; }
     ;
 
 default_opt
-    : DEFAULT '{' elementos '}' { $$ = $3; }
-    | /* vacío */               { $$ = null; }
+    : ',' DEFAULT '{' elementos '}'
+        { $$ = { tipo: 'DEFAULT', body: $4, linea: @2.first_line }; }
+    | DEFAULT '{' elementos '}'
+        { $$ = { tipo: 'DEFAULT', body: $3, linea: @1.first_line }; }
+    | /* vacío */
+        { $$ = null; }
     ;

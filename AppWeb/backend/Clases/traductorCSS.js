@@ -102,10 +102,11 @@ class TraductorCSS {
      * @returns {{ css: string, errores: ErrorLSS[] }}
      */
     static analizar(entrada) {
-        StylesParser.yy = { errores: [] };
+        const parserObj = StylesParser.parser;
+        parserObj.yy = { errores: [] };
 
-        StylesParser.yy.parseError = function(msg, hash) {
-            StylesParser.yy.errores.push({
+        parserObj.yy.parseError = function(msg, hash) {
+            parserObj.yy.errores.push({
                 tipo: 'Sintáctico',
                 descripcion: msg,
                 linea: hash?.loc?.first_line ?? 0,
@@ -120,7 +121,7 @@ class TraductorCSS {
         try {
             const resultado = StylesParser.parse(entrada);
             ast             = resultado?.ast ?? null;
-            const rawErrs   = StylesParser.yy.errores ?? [];
+            const rawErrs   = parserObj.yy.errores ?? [];
 
             // Convertir errores crudos del Jison → ErrorLSS
             rawErrs.forEach(e => {
@@ -163,7 +164,15 @@ class TraductorCSS {
         // Agregar errores semánticos detectados en traducción
         erroresSem.forEach(e => errores.push(e));
 
-        return { css, errores };
+        const tablaSimbolos = {
+            variables: [...globalTS.simbolos.entries()].map(([id, valor]) => ({ id, valor })),
+            estilos:   Object.keys(estilosBase).map(id => ({
+                id,
+                propiedades: estilosBase[id]?.length ?? 0
+            }))
+        };
+
+        return { css, errores, tablaSimbolos };
     }
 
     /* ── Genera CSS a partir de una lista de nodos ── */

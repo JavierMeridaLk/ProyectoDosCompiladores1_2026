@@ -33,7 +33,6 @@ class EntornoPrincipal {
     }
 
     registrarFuncion(id, paramsCount) {
-        // Las funciones siempre se registran en el entorno raíz
         const raiz = this._raiz();
         if (raiz.funciones.has(id)) return false;
         raiz.funciones.set(id, { paramsCount });
@@ -63,9 +62,23 @@ class TraductorPrincipal {
      * @returns {{ js: string, errores: ErrorLSS[] }}
      */
     static analizar(entrada, rutaActual = process.cwd()) {
-        Parser.yy = { errores: [] };
-        Parser.yy.parseError = function(msg, hash) {
-            Parser.yy.errores.push({
+
+        const parserObj = Parser.parser;
+
+        // 1. Inicializar yy con errores vacío en el parser REAL
+        parserObj.yy = { errores: [] };
+
+        // 2. Parchear performAction del lexer para garantizar yy.errores en
+        const _lexerPA = parserObj.lexer.performAction;
+        parserObj.lexer.performAction = function(yy, yy_, idx, YY_START) {
+            if (!yy.errores) yy.errores = [];
+            return _lexerPA.call(this, yy, yy_, idx, YY_START);
+        };
+
+        // 3. Sobreescribir parseError para acumular en vez de lanzar excepción
+        parserObj.yy.parseError = function(msg, hash) {
+            if (!parserObj.yy.errores) parserObj.yy.errores = [];
+            parserObj.yy.errores.push({
                 tipo: 'Sintáctico',
                 descripcion: msg,
                 linea: hash?.loc?.first_line ?? 0,
@@ -80,7 +93,7 @@ class TraductorPrincipal {
         try {
             const resultado = Parser.parse(entrada);
             ast             = resultado?.ast ?? null;
-            const rawErrs   = Parser.yy.errores ?? [];
+            const rawErrs   = parserObj.yy.errores ?? [];
 
             rawErrs.forEach(e => {
                 errores.push(new ErrorLSS(
@@ -113,37 +126,49 @@ class TraductorPrincipal {
         const js = this._generarJS(ast, rutaActual, entorno, erroresSem);
 
         erroresSem.forEach(e => errores.push(e));
-        return { js, errores };
+
+        const tablaSimbolos = {
+            variables: [...entorno._raiz().variables.entries()].map(([id, v]) => ({ id, ...v })),
+            funciones: [...entorno._raiz().funciones.entries()].map(([id, v]) => ({ id, ...v }))
+        };
+
+        return { js, errores, tablaSimbolos };
     }
 
     /* ── Genera el JS completo ── */
     static _generarJS(ast, rutaActual, entorno, erroresSem) {
         const lineas = [];
 
-        lineas.push('// ── ARCHIVO PRINCIPAL GENERADO ──\n');
+        lineas.push('// -- ARCHIVO PRINCIPAL GENERADO --\n');
 
         /* Imports */
         lineas.push(this._procesarImports(ast.imports, rutaActual, erroresSem));
 
-        /* Variables globales */
-        lineas.push('// Variables Globales');
+        // Todo va dentro de un async DOMContentLoaded para que:
+        // 1) los `await ejecutarSQL(...)` globales sean válidos
+        // 2) las funciones puedan acceder a las variables globales
+        lineas.push('document.addEventListener("DOMContentLoaded", async () => {');
+
+        /* Variables globales (dentro del callback async) */
+        lineas.push('    // Variables Globales');
         (ast.globales ?? []).filter(Boolean).forEach(g => {
             const linea = this._traducirDeclaracion(g, entorno, erroresSem, false);
-            if (linea) lineas.push(linea);
+            if (linea) lineas.push('    ' + linea);
         });
         lineas.push('');
 
-        /* Funciones */
-        lineas.push('// Funciones');
+        /* Funciones (dentro del callback para acceder a variables globales) */
+        lineas.push('    // Funciones');
         (ast.funciones ?? []).filter(Boolean).forEach(f => {
             const bloque = this._traducirFuncion(f, entorno, erroresSem);
-            if (bloque) lineas.push(bloque);
+            if (bloque) {
+                bloque.split('\n').forEach(l => lineas.push('    ' + l));
+                lineas.push('');
+            }
         });
-        lineas.push('');
 
         /* Main */
-        lineas.push('// ── Función Principal ──');
-        lineas.push('document.addEventListener("DOMContentLoaded", () => {');
+        lineas.push('    // -- Bloque Principal --');
         lineas.push('    let __html = "";');
         lineas.push('');
 
@@ -154,7 +179,7 @@ class TraductorPrincipal {
 
         lineas.push('');
         lineas.push('    document.body.innerHTML = __html;');
-        lineas.push('});');
+        lineas.push('});')
 
         return lineas.join('\n');
     }
@@ -177,14 +202,22 @@ class TraductorPrincipal {
                     `Archivo importado no encontrado: "${rutaRel}"`,
                     imp.linea ?? 0, 0
                 ));
-                lineas.push(`// ⚠ IMPORT NO ENCONTRADO: ${rutaRel}`);
+                lineas.push(`// [!] IMPORT NO ENCONTRADO: ${rutaRel}`);
             } else {
-                lineas.push(`// ✔ import "${rutaRel}"`);
+                lineas.push(`// [OK] import "${rutaRel}"`);
             }
         });
 
         lineas.push('');
         return lineas.join('\n');
+    }
+
+    /* ══════════════════════════════════════════════════════════
+       UTILIDAD DE BASE DE DATOS
+       ══════════════════════════════════════════════════════════ */
+    static _prepararQuery(query) {
+        if (!query) return '';
+        return query.replace(/\$([a-zA-Z0-9_]+)/g, '${$1}');
     }
 
     /* ══════════════════════════════════════════════════════════
@@ -203,7 +236,6 @@ class TraductorPrincipal {
             return null;
         }
 
-        /* Entorno local de la función: registrar parámetros */
         const entornoLocal = new EntornoPrincipal(entornoGlobal);
         (f.params ?? []).forEach(p => {
             entornoLocal.registrarVariable(p.id, p.tipo);
@@ -218,20 +250,22 @@ class TraductorPrincipal {
             .map(l => `    ${l}`)
             .join('\n');
 
-        return `function ${f.id}(${params}) {\n${cuerpo}\n}`;
+        return `async function ${f.id}(${params}) {\n${cuerpo}\n}`;
     }
 
     static _traducirInstruccionFuncion(inst, erroresSem) {
         switch (inst.tipo) {
-            case 'EXECUTE':
+            case 'EXECUTE': {
+                const queryFuncion = this._prepararQuery(inst.query);
                 return (
 `try {
-        ejecutarSQL(\`${inst.query}\`);
+        await ejecutarSQL(\`${queryFuncion}\`);
     } catch (__err) {
         alert("Error DB: " + __err.message);
         return;
     }`
                 );
+            }
             case 'LOAD':
                 return `window.location.href = ${this._traducirExpresion(inst.path)};`;
             default:
@@ -247,14 +281,6 @@ class TraductorPrincipal {
     /* ══════════════════════════════════════════════════════════
        INSTRUCCIONES MAIN / BLOQUES
        ══════════════════════════════════════════════════════════ */
-
-    /**
-     * Traduce una instrucción y la indenta n niveles.
-     * @param {object} inst   Nodo AST
-     * @param {EntornoPrincipal} entorno
-     * @param {ErrorLSS[]} erroresSem
-     * @param {number} nivel  Niveles de indentación (1 = 4 espacios)
-     */
     static _traducirInstruccionMain(inst, entorno, erroresSem, nivel = 1) {
         if (!inst) return null;
         const ind = '    '.repeat(nivel);
@@ -290,7 +316,6 @@ class TraductorPrincipal {
                 codigo = `${inst.id}[${this._traducirExpresion(inst.index)}] = ${this._traducirExpresion(inst.exp)};`;
                 break;
 
-            /* FIX: COMP_CALL con args posicionales correctos */
             case 'COMP_CALL': {
                 const args = (inst.args ?? [])
                     .map(a => this._traducirExpresion(a))
@@ -299,23 +324,25 @@ class TraductorPrincipal {
                 break;
             }
 
-            case 'EXECUTE':
+            case 'EXECUTE': {
+                const queryMain = this._prepararQuery(inst.query);
                 codigo = (
 `try {
-${ind}    ejecutarSQL(\`${inst.query}\`);
+${ind}    await ejecutarSQL(\`${queryMain}\`);
 ${ind}} catch (__err) {
 ${ind}    alert("Error DB: " + __err.message);
 ${ind}}`
                 );
                 return `${ind}${codigo}`;
+            }
 
-            case 'IF':      codigo = this._traducirIf(inst, entorno, erroresSem, nivel);      return codigo;
-            case 'SWITCH':  codigo = this._traducirSwitch(inst, entorno, erroresSem, nivel);   return codigo;
-            case 'WHILE':   codigo = this._traducirWhile(inst, entorno, erroresSem, nivel);    return codigo;
-            case 'DO_WHILE':codigo = this._traducirDoWhile(inst, entorno, erroresSem, nivel);  return codigo;
-            case 'FOR':     codigo = this._traducirFor(inst, entorno, erroresSem, nivel);      return codigo;
-            case 'BREAK':   return `${ind}break;`;
-            case 'CONTINUE':return `${ind}continue;`;
+            case 'IF':       return this._traducirIf(inst, entorno, erroresSem, nivel);
+            case 'SWITCH':   return this._traducirSwitch(inst, entorno, erroresSem, nivel);
+            case 'WHILE':    return this._traducirWhile(inst, entorno, erroresSem, nivel);
+            case 'DO_WHILE': return this._traducirDoWhile(inst, entorno, erroresSem, nivel);
+            case 'FOR':      return this._traducirFor(inst, entorno, erroresSem, nivel);
+            case 'BREAK':    return `${ind}break;`;
+            case 'CONTINUE': return `${ind}continue;`;
 
             default:
                 erroresSem.push(new ErrorLSS(
@@ -331,7 +358,7 @@ ${ind}}`
 
     /* ── Declaraciones ── */
     static _traducirDeclaracion(inst, entorno, erroresSem, esLocal) {
-        const kw = esLocal ? 'let' : 'let';
+        const kw = 'let';
 
         switch (inst.tipo) {
             case 'DECLARACION': {
@@ -373,6 +400,7 @@ ${ind}}`
             }
 
             case 'DECLARACION_ARR_DB': {
+                const queryArr = this._prepararQuery(inst.query);
                 if (!entorno.registrarVariable(inst.id, inst.tipoDato, true)) {
                     erroresSem.push(new ErrorLSS(
                         'Semántico',
@@ -381,7 +409,7 @@ ${ind}}`
                     ));
                     return `/* arreglo duplicado: ${inst.id} */`;
                 }
-                return `${kw} ${inst.id} = ejecutarSQL(\`${inst.query}\`);`;
+                return `${kw} ${inst.id} = await ejecutarSQL(\`${queryArr}\`);`;
             }
 
             default: return null;
@@ -391,8 +419,6 @@ ${ind}}`
     /* ── If / else if / else ── */
     static _traducirIf(nodo, entorno, erroresSem, nivel) {
         const ind    = '    '.repeat(nivel);
-        const indIn  = '    '.repeat(nivel + 1);
-
         const cond   = this._traducirExpresion(nodo.cond);
         const cuerpo = this._traducirBloque(nodo.body, entorno, erroresSem, nivel + 1);
 
@@ -414,19 +440,18 @@ ${ind}}`
 
     /* ── Switch ── */
     static _traducirSwitch(nodo, entorno, erroresSem, nivel) {
-        const ind   = '    '.repeat(nivel);
-        const ind1  = '    '.repeat(nivel + 1);
-        const ind2  = '    '.repeat(nivel + 2);
+        const ind  = '    '.repeat(nivel);
+        const ind1 = '    '.repeat(nivel + 1);
+        const ind2 = '    '.repeat(nivel + 2);
 
-        const expr  = this._traducirExpresion(nodo.exp);
-        let codigo  = `${ind}switch (${expr}) {\n`;
+        const expr = this._traducirExpresion(nodo.exp);
+        let codigo = `${ind}switch (${expr}) {\n`;
 
-        /* FIX: manejo de fall-through entre cases */
         const cases = nodo.cases ?? [];
         for (let i = 0; i < cases.length; i++) {
-            const c    = cases[i];
-            const val  = this._traducirExpresion(c.val);
-            codigo    += `${ind1}case ${val}:\n`;
+            const c   = cases[i];
+            const val = this._traducirExpresion(c.val);
+            codigo   += `${ind1}case ${val}:\n`;
 
             if (!c.fallThrough) {
                 const body = this._traducirBloque(c.body, entorno, erroresSem, nivel + 2);
@@ -462,7 +487,7 @@ ${ind}}`
 
     /* ── For ── */
     static _traducirFor(nodo, entorno, erroresSem, nivel) {
-        const ind     = '    '.repeat(nivel);
+        const ind        = '    '.repeat(nivel);
         const entornoFor = new EntornoPrincipal(entorno);
 
         let init = '';
@@ -475,10 +500,8 @@ ${ind}}`
             }
         }
 
-        /* Condición */
         const cond = this._traducirExpresion(nodo.cond);
 
-        /* Incremento*/
         let inc = '';
         if (nodo.inc) {
             inc = `${nodo.inc.id} = ${this._traducirExpresion(nodo.inc.exp)}`;
@@ -488,7 +511,7 @@ ${ind}}`
         return `${ind}for (${init}; ${cond}; ${inc}) {\n${cuerpo}\n${ind}}`;
     }
 
-    /* ── Traduce un bloque de instrucciones ── */
+    /* ── Bloque de instrucciones ── */
     static _traducirBloque(instrucciones, entorno, erroresSem, nivel) {
         return (instrucciones ?? [])
             .filter(Boolean)

@@ -414,6 +414,87 @@ export class IdeService {
   }
 
   // =========================
+  // 👁️ VISTA PREVIA
+  // =========================
+  async previewProject() {
+    const files = Object.entries(this.fileContents)
+      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
+      .map(([path, content]) => ({ path, content }));
+
+    if (!files.length) {
+      this.notify.error('No hay archivos del proyecto para previsualizar');
+      return;
+    }
+
+    try {
+      const titulo = this.rootName.value || 'Proyecto LSS';
+      const html   = await this.api.previewProject(files, titulo);
+      const blob   = new Blob([html], { type: 'text/html' });
+      const url    = URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch {
+      this.notify.error('Error al generar la vista previa');
+    }
+  }
+
+  // =========================
+  // 📦 EXPORTAR PRODUCCIÓN
+  // =========================
+  async exportProject() {
+    if (!this.rootHandle) {
+      this.notify.error('Carga un proyecto primero');
+      return;
+    }
+
+    const files = Object.entries(this.fileContents)
+      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
+      .map(([path, content]) => ({ path, content }));
+
+    if (!files.length) {
+      this.notify.error('No hay archivos del proyecto para exportar');
+      return;
+    }
+
+    const nombre = this.rootName.value || 'proyecto';
+
+    let res: any;
+    try {
+      res = await this.api.exportProject(files, nombre);
+    } catch {
+      this.notify.error('Error de conexión con el backend');
+      return;
+    }
+
+    if (!res.ok) {
+      this.notify.error(res.error ?? 'Error al exportar');
+      if (res.results) {
+        const errs = res.results
+          .flatMap((r: any) => r.errores?.map((e: any) => `[${r.file.split('/').pop()}] ${e.descripcion}`) ?? []);
+        alert(`❌ No se puede exportar — hay errores:\n\n${errs.join('\n')}`);
+      }
+      return;
+    }
+
+    // Crear carpeta dist/ dentro del proyecto y escribir los archivos
+    try {
+      const distHandle = await this.rootHandle.getDirectoryHandle('dist', { create: true });
+
+      for (const archivo of (res.archivos ?? [])) {
+        const fileHandle = await distHandle.getFileHandle(archivo.nombre, { create: true });
+        const writable   = await fileHandle.createWritable();
+        await writable.write(archivo.contenido);
+        await writable.close();
+      }
+
+      await this.refreshTree();
+      this.notify.success(`Proyecto exportado en dist/ (${res.archivos?.length} archivos)`);
+
+    } catch (err: any) {
+      this.notify.error('Error al escribir archivos: ' + (err?.message ?? ''));
+    }
+  }
+
+  // =========================
   // 🗑 ELIMINAR NODO
   // =========================
   async deleteNode(node: FileNode) {

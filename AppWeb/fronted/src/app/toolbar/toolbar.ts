@@ -81,21 +81,13 @@ export class Toolbar {
   }
   // ... tus otros métodos (save, saveAll, run, etc.)
 
-  async exportToZip() {
-    this.closeAll(); // Cerramos el menú
-    
-    // Llamamos a un método que deberás crear en tu ide.service.ts
-    try {
-      await this.ide.exportProjectAsZip();
-      console.log('Proyecto exportado con éxito');
-    } catch (error) {
-      console.error('Error al exportar el proyecto:', error);
-      alert('Hubo un error al exportar el proyecto.');
-    }
+  async export() {
+    this.closeAll();
+    await this.ide.exportProject();
   }
 
-  preview() {
-    console.log('Vista previa');
+  async preview() {
     this.closeAll();
+    await this.ide.previewProject();
   }
 }

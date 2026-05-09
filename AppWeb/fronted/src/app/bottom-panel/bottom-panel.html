@@ -22,18 +22,40 @@
   <div class="panel-content" #terminalScroll>
 
     @if (!dbHistory.length) {
-      <div class="hint">Escribe una query SQL y presiona <kbd>Enter</kbd> para ejecutarla.</div>
+      <div class="hint">
+        Escribe en el lenguaje <strong>.db</strong> o SQL puro y presiona <kbd>Enter</kbd>.
+      </div>
     }
 
     @for (entry of dbHistory; track $index) {
       <div class="db-entry">
 
+        <!-- Query ingresada -->
         <div class="db-query">&gt; {{ entry.query }}</div>
+
+        <!-- SQL generado por el traductor -->
+        @if (entry.sql && entry.sql !== entry.query) {
+          <div class="db-sql-generated">
+            <span class="db-sql-label">SQL →</span> {{ entry.sql }}
+          </div>
+        }
+
+        <!-- Errores de compilación/ejecución -->
+        @if (entry.errores?.length) {
+          @for (e of entry.errores; track $index) {
+            <div class="db-error">
+              ✗ [{{ e.tipo }}]
+              @if (e.linea) { <span>L{{ e.linea }}</span> }
+              {{ e.descripcion }}
+            </div>
+          }
+        }
 
         @if (entry.error) {
           <div class="db-error">✗  {{ entry.error }}</div>
         }
 
+        <!-- Resultados -->
         @for (row of entry.rows; track $index) {
 
           @if (row.tipo === 'select') {
@@ -72,12 +94,12 @@
   </div>
 
   <div class="terminal-input">
-    <span class="prompt">sql&gt;</span>
+    <span class="prompt">db&gt;</span>
     <input
       [(ngModel)]="dbCommand"
       (keydown.enter)="executeDb()"
       [disabled]="dbLoading"
-      placeholder="SELECT * FROM tabla;"
+      placeholder="TABLE producto COLUMNS nombre=string, precio=float;"
       autocomplete="off"
       spellcheck="false"
     />

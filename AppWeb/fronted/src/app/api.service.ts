@@ -52,4 +52,36 @@ export class ApiService {
       )
     );
   }
+
+  async executeDbTerminal(query: string): Promise<{
+    ok: boolean;
+    sql?: string;
+    rows?: DbRow[];
+    errores?: { tipo: string; descripcion: string; linea: number; columna: number }[];
+    error?: string;
+  }> {
+    return firstValueFrom(
+      this.http.post<any>(`${this.base}/db-terminal`, { query })
+    );
+  }
+
+  async previewProject(files: CompileFile[], titulo?: string): Promise<string> {
+    const html = await firstValueFrom(
+      this.http.post(`${this.base}/preview`, { files, titulo },
+        { responseType: 'text' }
+      )
+    );
+    return html;
+  }
+
+  async exportProject(files: CompileFile[], nombre?: string): Promise<{
+    ok: boolean;
+    archivos?: { nombre: string; contenido: string }[];
+    error?: string;
+    results?: CompileResult[];
+  }> {
+    return firstValueFrom(
+      this.http.post<any>(`${this.base}/export`, { files, nombre })
+    );
+  }
 }
