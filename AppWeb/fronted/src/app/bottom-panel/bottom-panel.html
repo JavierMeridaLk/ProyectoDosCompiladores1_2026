@@ -1,20 +1,124 @@
 <div class="panel-header">
-  <div class="panel-tab active">Terminal</div>
+
+  <div class="panel-tab" [class.active]="activeTab === 'terminal'" (click)="activeTab = 'terminal'">
+    Terminal
+  </div>
+
+  <div class="panel-tab" [class.active]="activeTab === 'errores'" (click)="activeTab = 'errores'">
+    Errores
+    @if (errors.length) {
+      <span class="error-badge">{{ errors.length }}</span>
+    }
+  </div>
+
+  @if (activeTab === 'terminal' && dbHistory.length) {
+    <button class="clear-btn" (click)="clearDb()" title="Limpiar">✕</button>
+  }
+
 </div>
 
-<div class="panel-content">
+<!-- ══════════ TERMINAL DB ══════════ -->
+@if (activeTab === 'terminal') {
+  <div class="panel-content" #terminalScroll>
 
-  <div *ngFor="let line of history" class="terminal-line">
-    {{ line }}
+    @if (!dbHistory.length) {
+      <div class="hint">Escribe una query SQL y presiona <kbd>Enter</kbd> para ejecutarla.</div>
+    }
+
+    @for (entry of dbHistory; track $index) {
+      <div class="db-entry">
+
+        <div class="db-query">&gt; {{ entry.query }}</div>
+
+        @if (entry.error) {
+          <div class="db-error">✗  {{ entry.error }}</div>
+        }
+
+        @for (row of entry.rows; track $index) {
+
+          @if (row.tipo === 'select') {
+            @if (row.resultado && row.resultado.length) {
+              <table class="db-table">
+                <thead>
+                  <tr>
+                    @for (col of rowKeys(row.resultado[0]); track col) {
+                      <th>{{ col }}</th>
+                    }
+                  </tr>
+                </thead>
+                <tbody>
+                  @for (fila of row.resultado; track $index) {
+                    <tr>
+                      @for (col of rowKeys(fila); track col) {
+                        <td>{{ fila[col] }}</td>
+                      }
+                    </tr>
+                  }
+                </tbody>
+              </table>
+            } @else {
+              <div class="db-ok">(sin resultados)</div>
+            }
+          }
+
+          @if (row.tipo === 'change') {
+            <div class="db-ok">✓  {{ row.changes }} fila(s) afectada(s)</div>
+          }
+
+        }
+      </div>
+    }
+
   </div>
 
   <div class="terminal-input">
-    <span class="prompt">></span>
+    <span class="prompt">sql&gt;</span>
     <input
-      [(ngModel)]="command"
-      (keydown.enter)="execute()"
-      placeholder="Escribe un comando..."
+      [(ngModel)]="dbCommand"
+      (keydown.enter)="executeDb()"
+      [disabled]="dbLoading"
+      placeholder="SELECT * FROM tabla;"
+      autocomplete="off"
+      spellcheck="false"
     />
+    @if (dbLoading) {
+      <span class="loading">…</span>
+    }
   </div>
+}
 
-</div>
+<!-- ══════════ ERRORES ══════════ -->
+@if (activeTab === 'errores') {
+  <div class="panel-content">
+
+    @if (compiling) {
+      <div class="hint">Compilando...</div>
+    } @else if (!errors.length) {
+      <div class="hint no-errors">✓  Sin errores</div>
+    } @else {
+      <table class="error-table">
+        <thead>
+          <tr>
+            <th>Archivo</th>
+            <th>Tipo</th>
+            <th>Línea</th>
+            <th>Col</th>
+            <th>Descripción</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (e of errors; track $index) {
+            <tr>
+              <td class="col-file">{{ e['archivo'] ?? '—' }}</td>
+              <td class="col-tipo">{{ e.tipo }}</td>
+              <td class="col-num">{{ e.linea }}</td>
+              <td class="col-num">{{ e.columna }}</td>
+              <td class="col-desc">{{ e.descripcion }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    }
+
+  </div>
+}

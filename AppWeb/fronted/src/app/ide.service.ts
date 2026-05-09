@@ -1,6 +1,9 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { NotificationService } from './notification.service';
+import { ApiService, CompileResult, CompileError } from './api.service';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 
 export interface FileNode {
   name: string;
@@ -15,7 +18,11 @@ export interface FileNode {
 @Injectable({ providedIn: 'root' })
 export class IdeService {
 
-  constructor(private notify: NotificationService) {}
+  constructor(
+    private notify: NotificationService, 
+    private api: ApiService,
+    private ngZone: NgZone // ✅ NgZone inyectado para reactividad global
+  ) {}
 
   rootHandle: any = null;
 
@@ -25,6 +32,9 @@ export class IdeService {
   fileTree = new BehaviorSubject<FileNode[]>([]);
   openFiles = new BehaviorSubject<string[]>([]);
   activeFile = new BehaviorSubject<string | null>(null);
+  
+  // ✅ Indicador del cursor global
+  cursorPosition = new BehaviorSubject<{line: number, column: number}>({line: 1, column: 1});
 
   fileHandles: Record<string, any> = {};
   fileContents: Record<string, string> = {};
@@ -34,22 +44,33 @@ export class IdeService {
 
   terminalOpen = new BehaviorSubject<boolean>(true);
 
+  projectName: string = 'Proyecto_Sin_Nombre';
+
+  // ==========================================
+  // 🧠 MOTOR DE REACTIVIDAD (NUEVO)
+  // ==========================================
+  private emitirCambioGlobal(accion: () => void) {
+    this.ngZone.run(() => {
+      accion();
+    });
+  }
+
   // =========================
   // 📁 CARGAR PROYECTO
   // =========================
   async loadProject() {
     try {
       this.rootHandle = await (window as any).showDirectoryPicker();
-
       this.resetState();
 
-      const children = await this.readDirectory(
-        this.rootHandle,
-        this.rootHandle.name
-      );
+      const children = await this.readDirectory(this.rootHandle, this.rootHandle.name);
 
-      this.rootName.next(this.rootHandle.name);
-      this.fileTree.next([...children]);
+      this.projectName = this.rootHandle.name; // ✅ Actualizamos el nombre para el ZIP
+
+      this.emitirCambioGlobal(() => {
+        this.rootName.next(this.rootHandle.name);
+        this.fileTree.next([...children]);
+      });
 
       this.notify.success('Proyecto cargado correctamente');
     } catch (e) {
@@ -63,17 +84,19 @@ export class IdeService {
   async newProject(name: string) {
     try {
       const root = await (window as any).showDirectoryPicker();
-
       const projectHandle = await root.getDirectoryHandle(name, { create: true });
 
       this.rootHandle = projectHandle;
-
       this.resetState();
 
       const children = await this.readDirectory(projectHandle, name);
 
-      this.rootName.next(name);
-      this.fileTree.next([...children]);
+      this.projectName = name; // ✅ Actualizamos el nombre para el ZIP
+
+      this.emitirCambioGlobal(() => {
+        this.rootName.next(name);
+        this.fileTree.next([...children]);
+      });
 
       this.notify.success(`Proyecto "${name}" creado`);
     } catch (e) {
@@ -88,9 +111,12 @@ export class IdeService {
     this.fileHandles = {};
     this.fileContents = {};
     this.savedFileContents = {};
-    this.openFiles.next([]);
-    this.activeFile.next(null);
-    this.dirtyFiles.next(new Set());
+    
+    this.emitirCambioGlobal(() => {
+      this.openFiles.next([]);
+      this.activeFile.next(null);
+      this.dirtyFiles.next(new Set());
+    });
   }
 
   // =========================
@@ -100,7 +126,6 @@ export class IdeService {
     const nodes: FileNode[] = [];
 
     for await (const [name, handle] of dirHandle.entries()) {
-
       const fullPath = `${currentPath}/${name}`;
 
       if (handle.kind === 'directory') {
@@ -114,7 +139,6 @@ export class IdeService {
         });
       } else {
         this.fileHandles[fullPath] = handle;
-
         nodes.push({
           name,
           path: fullPath,
@@ -123,7 +147,6 @@ export class IdeService {
         });
       }
     }
-
     return nodes;
   }
 
@@ -140,11 +163,13 @@ export class IdeService {
     this.fileContents[path] = content;
     this.savedFileContents[path] = content;
 
-    if (!this.openFiles.value.includes(path)) {
-      this.openFiles.next([...this.openFiles.value, path]);
-    }
-
-    this.activeFile.next(path);
+    this.emitirCambioGlobal(() => {
+      const actuales = this.openFiles.getValue();
+      if (!actuales.includes(path)) {
+        this.openFiles.next([...actuales, path]);
+      }
+      this.activeFile.next(path);
+    });
 
     this.notify.info(`Archivo abierto`);
   }
@@ -155,17 +180,17 @@ export class IdeService {
 
   updateFileContent(path: string, content: string) {
     this.fileContents[path] = content;
-
     const saved = this.savedFileContents[path];
-    const dirty = new Set(this.dirtyFiles.value);
-
-    if (content !== saved) {
-      dirty.add(path);
-    } else {
-      dirty.delete(path);
-    }
-
-    this.dirtyFiles.next(dirty);
+    
+    this.emitirCambioGlobal(() => {
+      const dirty = new Set(this.dirtyFiles.value);
+      if (content !== saved) {
+        dirty.add(path);
+      } else {
+        dirty.delete(path);
+      }
+      this.dirtyFiles.next(dirty);
+    });
   }
 
   async saveFile(path: string) {
@@ -179,9 +204,11 @@ export class IdeService {
 
       this.savedFileContents[path] = this.fileContents[path];
 
-      const dirty = new Set(this.dirtyFiles.value);
-      dirty.delete(path);
-      this.dirtyFiles.next(dirty);
+      this.emitirCambioGlobal(() => {
+        const dirty = new Set(this.dirtyFiles.value);
+        dirty.delete(path);
+        this.dirtyFiles.next(dirty);
+      });
 
       this.notify.success(`Archivo guardado`);
     } catch (e) {
@@ -194,7 +221,6 @@ export class IdeService {
       for (const file of this.openFiles.value) {
         await this.saveFile(file);
       }
-
       this.notify.success('Todos los archivos guardados');
     } catch (e) {
       this.notify.error('Error guardando archivos');
@@ -202,12 +228,23 @@ export class IdeService {
   }
 
   closeFile(path: string) {
-    const updated = this.openFiles.value.filter(f => f !== path);
-    this.openFiles.next(updated);
+    this.emitirCambioGlobal(() => {
+      const updated = this.openFiles.value.filter(f => f !== path);
+      this.openFiles.next(updated);
 
-    if (this.activeFile.value === path) {
-      this.activeFile.next(updated.length ? updated[0] : null);
-    }
+      if (this.activeFile.value === path) {
+        this.activeFile.next(updated.length ? updated[0] : null);
+      }
+    });
+  }
+
+  // =========================
+  // 📍 CURSOR
+  // =========================
+  updateCursorPosition(line: number, column: number) {
+    this.emitirCambioGlobal(() => {
+      this.cursorPosition.next({ line, column });
+    });
   }
 
   // =========================
@@ -215,46 +252,35 @@ export class IdeService {
   // =========================
   async createFile(name: string) {
     if (!this.rootHandle) return;
-
     await this.rootHandle.getFileHandle(name, { create: true });
-
     await this.refreshTree();
-
     this.notify.success(`Archivo creado`);
   }
 
   async createFolder(name: string) {
     if (!this.rootHandle) return;
-
     await this.rootHandle.getDirectoryHandle(name, { create: true });
-
     await this.refreshTree();
-
     this.notify.success(`Carpeta creada`);
   }
 
   async createFileInFolder(folderPath: string, name: string) {
     const dir = await this.getDirectoryFromPath(folderPath);
-
     const fileHandle = await dir.getFileHandle(name, { create: true });
-
+    
     const fullPath = `${folderPath}/${name}`;
-
     this.fileHandles[fullPath] = fileHandle;
     this.fileContents[fullPath] = '';
 
     await this.refreshTree();
-
     this.notify.success(`Archivo creado`);
   }
 
   async createFolderInFolder(folderPath: string, name: string) {
     const dir = await this.getDirectoryFromPath(folderPath);
-
     await dir.getDirectoryHandle(name, { create: true });
-
+    
     await this.refreshTree();
-
     this.notify.success(`Carpeta creada`);
   }
 
@@ -265,20 +291,17 @@ export class IdeService {
     if (!this.rootHandle) return;
 
     this.fileHandles = {};
+    const children = await this.readDirectory(this.rootHandle, this.rootHandle.name);
 
-    const children = await this.readDirectory(
-      this.rootHandle,
-      this.rootHandle.name
-    );
-
-    this.fileTree.next([...children]);
+    this.emitirCambioGlobal(() => {
+      this.fileTree.next([...children]);
+    });
   }
 
   // =========================
   // 🚚 MOVER ARCHIVOS
   // =========================
   async moveFile(fileNode: FileNode, targetFolder: FileNode) {
-
     if (fileNode.type !== 'file') return;
 
     const file = await fileNode.handle.getFile();
@@ -293,19 +316,16 @@ export class IdeService {
     await this.deleteFile(fileNode.path);
 
     const newPath = `${targetFolder.path}/${fileNode.name}`;
-
     this.fileHandles[newPath] = newHandle;
     delete this.fileHandles[fileNode.path];
 
     await this.refreshTree();
-
     this.notify.success(`Archivo movido`);
   }
 
   async deleteFile(path: string) {
     const parts = path.split('/');
     const fileName = parts.pop();
-
     let dir = this.rootHandle;
 
     if (parts[0] === this.rootHandle.name) {
@@ -317,13 +337,11 @@ export class IdeService {
     }
 
     await dir.removeEntry(fileName);
-
     this.notify.success(`Archivo eliminado`);
   }
 
   async getDirectoryFromPath(path: string): Promise<any> {
     const parts = path.split('/');
-
     let current = this.rootHandle;
 
     if (parts[0] === this.rootHandle.name) {
@@ -333,21 +351,77 @@ export class IdeService {
     for (const part of parts) {
       current = await current.getDirectoryHandle(part);
     }
-
     return current;
   }
 
   toggleTerminal() {
-    this.terminalOpen.next(!this.terminalOpen.value);
+    this.emitirCambioGlobal(() => {
+      this.terminalOpen.next(!this.terminalOpen.value);
+    });
   }
 
+  // =========================
+  // ▶️ COMPILAR PROYECTO
+  // =========================
+  compileErrors = new BehaviorSubject<CompileError[]>([]);
+  compiling = new BehaviorSubject<boolean>(false);
+
+  async compileProject() {
+    const files = Object.entries(this.fileContents)
+      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
+      .map(([path, content]) => ({ path, content }));
+
+    if (!files.length) {
+      this.notify.error('No hay archivos del proyecto para compilar');
+      return;
+    }
+
+    this.emitirCambioGlobal(() => {
+      this.terminalOpen.next(true);
+      this.compileErrors.next([]);
+      this.compiling.next(true);
+    });
+
+    let results: CompileResult[];
+    try {
+      results = await this.api.compileProject(files);
+    } catch {
+      this.notify.error('Error de conexión con el backend (http://localhost:3000)');
+      this.emitirCambioGlobal(() => this.compiling.next(false));
+      return;
+    }
+
+    const allErrors: CompileError[] = [];
+    for (const r of results) {
+      if (!r.ignorado && r.errores?.length) {
+        const nombre = r.file.split('/').pop() ?? r.file;
+        for (const e of r.errores) {
+          allErrors.push({ ...e, archivo: nombre } as any);
+        }
+      }
+    }
+
+    this.emitirCambioGlobal(() => {
+      this.compileErrors.next(allErrors);
+      this.compiling.next(false);
+    });
+
+    if (allErrors.length === 0) {
+      this.notify.success('Compilación exitosa — sin errores');
+    } else {
+      this.notify.error(`Compilación con ${allErrors.length} error(es)`);
+    }
+  }
+
+  // =========================
+  // 🗑 ELIMINAR NODO
+  // =========================
   async deleteNode(node: FileNode) {
     if (!this.rootHandle) return;
 
     try {
       const parts = node.path.split('/');
       const name = parts.pop();
-
       let dir = this.rootHandle;
 
       if (parts[0] === this.rootHandle.name) {
@@ -365,14 +439,36 @@ export class IdeService {
       delete this.savedFileContents[node.path];
 
       this.closeFile(node.path);
-
       await this.refreshTree();
 
       this.notify.success(`Eliminado correctamente`);
-
     } catch (err) {
       console.error('Error eliminando:', err);
       this.notify.error('Error eliminando');
     }
+  }
+
+  // =========================
+  // 📦 EXPORTAR ZIP
+  // =========================
+  async exportProjectAsZip() {
+    const zip = new JSZip();
+    const projectFiles = this.getAllFilesContent();
+  
+    for (const [filePath, content] of Object.entries(projectFiles)) {
+      zip.file(filePath, content as string);
+    }
+  
+    const content = await zip.generateAsync({ type: 'blob' });
+  
+    const nombreLimpio = this.projectName.replace(/\s+/g, '_'); 
+    const nombreZip = `${nombreLimpio}.zip`;
+
+    saveAs(content, nombreZip);
+  }
+
+  // ✅ Ahora exporta TODOS los archivos del proyecto, no solo las pestañas abiertas
+  getAllFilesContent(): Record<string, string> {
+    return this.fileContents; 
   }
 }

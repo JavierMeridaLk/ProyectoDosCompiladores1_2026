@@ -8,6 +8,7 @@ import { IdeService } from '../ide.service';
   imports: [CommonModule],
   templateUrl: './toolbar.html',
   styleUrls: ['./toolbar.css'],
+  
 })
 export class Toolbar {
 
@@ -74,9 +75,23 @@ export class Toolbar {
     this.closeAll();
   }
 
-  run() {
-    console.log('Ejecutar');
+  async run() {
     this.closeAll();
+    await this.ide.compileProject();
+  }
+  // ... tus otros métodos (save, saveAll, run, etc.)
+
+  async exportToZip() {
+    this.closeAll(); // Cerramos el menú
+    
+    // Llamamos a un método que deberás crear en tu ide.service.ts
+    try {
+      await this.ide.exportProjectAsZip();
+      console.log('Proyecto exportado con éxito');
+    } catch (error) {
+      console.error('Error al exportar el proyecto:', error);
+      alert('Hubo un error al exportar el proyecto.');
+    }
   }
 
   preview() {

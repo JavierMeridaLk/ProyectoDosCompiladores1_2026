@@ -1,17 +1,111 @@
-/* Archivo: usuarios.db */
+/* ================================================================
+   prueba.db — Archivo de prueba completo del lenguaje .db
+   Cubre TODOS los casos del lenguaje:
+     ✔ Crear tablas con todos los tipos de datos
+     ✔ Seleccionar columna
+     ✔ Insertar registros (todos los tipos de valores)
+     ✔ Actualizar registros con id
+     ✔ Eliminar registros con id
+     ✔ Expresiones aritméticas en valores
+     ✔ Casos de error recuperable (semánticos y sintácticos)
+   ================================================================ */
 
-/* Creación con múltiples tipos soportados */
-TABLE usuarios COLUMNS nombre = string, edad = int, saldo = float, activo = boolean;
 
-/* Inserciones simples y con expresiones aritméticas */
-usuarios[nombre = "Carlos", edad = 20 + 5, saldo = 1500.50, activo = true];
-usuarios[nombre = "Ana", edad = 30, saldo = 0.0, activo = false];
+/* ── 1. Crear tablas con todos los tipos ── */
 
-/* Actualización condicionada por el ID (IN) usando operaciones lógicas */
-usuarios[saldo = 1500.50 * 1.10, activo = true] IN 1;
+TABLE users COLUMNS
+    name=string,
+    age=int,
+    score=float,
+    balance=double,
+    active=boolean,
+    description=string;
 
-/* Eliminación */
-usuarios DELETE 2;
+TABLE products COLUMNS
+    title=string,
+    price=number,
+    quantity=int,
+    available=boolean;
 
-/* Selección simple */
-usuarios.saldo;
+TABLE orders COLUMNS
+    user_id=int,
+    product_id=int,
+    total=double,
+    notes=string;
+
+
+/* ── 2. Seleccionar columnas ── */
+
+users.name;
+users.age;
+products.price;
+orders.total;
+
+
+/* ── 3. Insertar registros ── */
+
+/* Insertar en users */
+users[name="Alice", age=30, score=9.5, balance=1500.75, active=true, description="Usuario premium"];
+
+/* Insertar en products */
+products[title="Pokeball", price=49.99, quantity=100, available=true];
+products[title="Potion", price=19.99, quantity=250, available=false];
+
+/* Insertar en orders */
+orders[user_id=1, product_id=1, total=49.99, notes="Primera compra"];
+
+
+/* ── 4. Insertar con expresiones aritméticas ── */
+
+products[title="Super Rod", price=10 + 5 * 2, quantity=50 - 10, available=true];
+users[name="Bob", age=20 + 5, score=8.5, balance=200 * 3, active=false, description="Usuario básico"];
+
+
+/* ── 5. Actualizar registros ── */
+
+users[name="Alice Updated", age=31] IN 1;
+products[price=59.99, quantity=90] IN 1;
+orders[total=99.98, notes="Orden actualizada"] IN 1;
+
+
+/* ── 6. Actualizar con expresión aritmética en el valor ── */
+
+products[price=49.99 + 5, quantity=100 - 5] IN 2;
+
+
+/* ── 7. Eliminar registros ── */
+
+orders DELETE 1;
+products DELETE 3;
+
+
+/* ════════════════════════════════════════════════════════
+   SECCIÓN DE ERRORES RECUPERABLES
+   ════════════════════════════════════════════════════════ */
+
+/* Error semántico 1: tabla duplicada */
+TABLE users COLUMNS name=string, age=int;
+
+/* Error semántico 2: SELECT en tabla no definida */
+unknown_table.name;
+
+/* Error semántico 3: SELECT de columna inexistente */
+users.nonexistent_column;
+
+/* Error semántico 4: INSERT en tabla no definida */
+ghost_table[name="nobody"];
+
+/* Error semántico 5: INSERT con columna inexistente */
+users[invalid_col="test", name="valid"];
+
+/* Error semántico 6: UPDATE en tabla no definida */
+ghost_table[name="nobody"] IN 1;
+
+/* Error semántico 7: DELETE en tabla no definida */
+ghost_table DELETE 5;
+
+/* Error semántico 8: tipo incompatible (string en columna int) */
+users[name="Valid", age="no soy numero"] IN 1;
+
+/* Error sintáctico recuperable: instrucción malformada */
+TABLE ;

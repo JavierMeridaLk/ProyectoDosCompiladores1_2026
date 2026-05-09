@@ -7,6 +7,8 @@
 .panel-header {
   height: 35px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
 }
 
 .panel-content {
@@ -54,5 +56,87 @@ input {
   border: none;
   outline: none;
   color: white;
+  font-family: monospace;
+}
+
+/* ── Colores por tipo de línea ── */
+.line-info    { color: #aaa; font-family: monospace; font-size: 12px; white-space: pre; }
+.line-success { color: #4af626; font-family: monospace; font-size: 12px; white-space: pre; }
+.line-error   { color: #f66; font-family: monospace; font-size: 12px; white-space: pre; }
+.line-output  { color: #569cd6; font-family: monospace; font-size: 12px; white-space: pre; }
+.line-sql     { color: #ce9178; font-family: monospace; font-size: 12px; white-space: pre; }
+.line-db      { color: #4fc1ff; font-family: monospace; font-size: 12px; white-space: pre; }
+
+/* ── Clear button ── */
+.clear-btn {
+  margin-left: auto;
+  margin-right: 8px;
+  background: transparent;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  font-size: 12px;
+}
+.clear-btn:hover { color: #fff; }
+
+/* ── DB Panel ── */
+.db-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.db-history {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.db-entry {
+  margin-bottom: 12px;
+}
+
+.db-query {
+  color: #ce9178;
+  font-family: monospace;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.db-error {
+  color: #f66;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.db-ok {
+  color: #4af626;
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.db-table {
+  border-collapse: collapse;
+  font-family: monospace;
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.db-table th {
+  background: #2a2d2e;
+  color: #569cd6;
+  padding: 3px 10px;
+  border: 1px solid #3e3e3e;
+  text-align: left;
+}
+
+.db-table td {
+  color: #d4d4d4;
+  padding: 3px 10px;
+  border: 1px solid #3e3e3e;
+}
+
+.loading {
+  color: #888;
+  margin-left: 8px;
   font-family: monospace;
 }

@@ -18,13 +18,16 @@
 
         <hr />
 
-        <div (click)="newProject(); closeAll()">📁Nuevo proyecto</div>
+        <div (click)="newProject(); closeAll()">📁 Nuevo proyecto</div>
         <div (click)="loadProject(); closeAll()">📂 Cargar proyecto</div>
 
         <hr />
 
         <div (click)="save(); closeAll()">💾 Guardar</div>
         <div (click)="saveAll(); closeAll()">💾 Guardar todo</div>
+
+        <hr />
+        <div (click)="exportToZip(); closeAll()">📦 Exportar (.zip)</div>
 
       </div>
     </div>

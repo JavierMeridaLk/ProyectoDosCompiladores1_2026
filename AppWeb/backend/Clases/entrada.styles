@@ -1,6 +1,113 @@
-/* 05-for-to.styles */
-@for $i from 1 to 3 {
-    margin-box-$i {
+/* Prueba avanzada de estilos */
+
+/* Estilo base */
+base-card {
+    height = 200;
+    width = 300;
+    background color = lightgray;
+    color = black;
+    padding = 10;
+    margin = 5;
+    border radius = 8;
+    border = 2 solid gray;
+}
+
+/* Herencia simple */
+card-destacado extends base-card {
+    background color = blue;
+    color = white;
+    border = 3 solid red;
+}
+
+/* Colores rgb y hex */
+caja-color {
+    background color = rgb(255, 128, 0);
+    color = #FFFFFF;
+    border color = rgb(0, 0, 200);
+    border width = 2;
+}
+
+/* Bordes por lado */
+caja-bordes {
+    border top = 2 solid red;
+    border right = 1 solid blue;
+    border bottom style = DOTTED;
+    border left color = green;
+    border radius = 12;
+}
+
+/* Texto */
+estilo-texto {
+    text size = 16;
+    text font = HELVETICA;
+    text align = CENTER;
+    color = black;
+}
+
+/* Porcentajes */
+caja-responsiva {
+    width = 80%;
+    min-width = 200;
+    max-width = 100%;
+    height = 50%;
+    padding = 5%;
+}
+
+/* Expresiones aritméticas */
+caja-calculada {
+    width = 100 + 50;
+    height = 300 - 50;
+    padding = 4 * 3;
+    margin = 100 / 5;
+    border radius = (4 + 6) * 2;
+    border width = 10 % 3;
+}
+
+/* For inclusivo - genera col-1, col-2, col-3, col-4 */
+@for $i from 1 through 4 {
+    col-$i {
+        width = $i * 25;
+        padding = $i * 2;
+        text size = 10 + $i * 2;
+        background color = white;
+    }
+}
+
+/* For exclusivo - genera font-1, font-2, font-3 */
+@for $i from 1 to 4 {
+    font-$i {
+        text size = $i * 14;
+        color = black;
         margin = $i * 5;
     }
 }
+
+/* Herencia con sobreescritura de bordes */
+panel-base {
+    background color = lightgray;
+    padding = 20;
+    border = 1 solid gray;
+    color = black;
+}
+
+panel-hijo extends panel-base {
+    background color = white;
+    border right = 3 solid blue;
+    border left = 3 solid blue;
+}
+
+/* Todas las fuentes */
+fuente-helvetica { text font = HELVETICA; }
+fuente-sans      { text font = SANS; }
+fuente-mono      { text font = MONO; }
+fuente-cursive   { text font = CURSIVE; }
+
+/* Todas las alineaciones */
+alinear-centro   { text align = CENTER; }
+alinear-derecha  { text align = RIGHT; }
+alinear-izquierda{ text align = LEFT; }
+
+/* Todos los estilos de borde */
+borde-linea   { border style = LINE; }
+borde-punteado{ border style = DOTTED; }
+borde-doble   { border style = DOUBLE; }

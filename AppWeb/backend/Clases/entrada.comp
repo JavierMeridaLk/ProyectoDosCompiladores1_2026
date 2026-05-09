@@ -1,13 +1,191 @@
-/* 04-logic.comp */
-statusComp(int $status) {
-    if ($status == 1) {
-        T("Iniciado")
-    } else ($status == 2) {
-        T("En progreso")
-    } else {
-        Switch($status) {
-            case 3 { T("Finalizado") },
-            default { T("Desconocido") }
+/* Prueba avanzada de componentes */
+
+/* Componente sin parametros */
+Header() {
+    <header>[
+        T<titulo>("Sistema Pokemon")
+        T("Bienvenido al sistema de gestion")
+    ]
+}
+
+/* Componente con parametros basicos */
+TarjetaUsuario(string nombre, int edad, bool activo) {
+    <card>[
+        T<nombre-style>("Nombre: $nombre")
+        T("Edad: `$edad + 0` años")
+        if ($activo) {
+            T<badge-activo>("Activo")
+        } else {
+            T<badge-inactivo>("Inactivo")
+        }
+    ]
+}
+
+/* Componente con imagen individual y carrusel */
+GaleriaFotos(string foto1, string foto2, string foto3) {
+    [
+        T("Foto principal:")
+        IMG<foto-principal>($foto1)
+        T("Galeria completa:")
+        IMG<galeria>($foto1, $foto2, $foto3)
+    ]
+}
+
+/* Componente con tabla */
+TablaEstadisticas(string etiqueta1, string etiqueta2, int valor1, int valor2) {
+    <tabla-style>[[
+        [[
+            [[ T("$etiqueta1") ]]
+            [[ T("$etiqueta2") ]]
+        ]]
+        [[
+            [[ T("`$valor1 + 0`") ]]
+            [[ T("`$valor2 + 0`") ]]
+        ]]
+    ]]
+}
+
+/* Componente con formulario completo */
+FormularioPokemon(function guardarPokemon, string nombreActual, int ppActual) {
+    FORM<form-style> {
+        T<titulo-form>("Editar Pokemon: $nombreActual")
+
+        INPUT_TEXT<input-style> {
+            id: "nombre",
+            label: "Nuevo nombre",
+            value: "$nombreActual"
+        }
+
+        INPUT_NUMBER<input-style> {
+            id: "pp",
+            label: "Puntos de poder",
+            value: $ppActual
+        }
+
+        INPUT_BOOL<input-style> {
+            id: "activo",
+            label: "Esta activo?",
+            value: true
+        }
+
+    } SUBMIT<btn-style> {
+        label: "Guardar cambios"
+        function: $guardarPokemon(@nombre, @pp, @activo)
+    }
+}
+
+/* Componente con for each */
+ListaPokemones(array pokemones) {
+    [
+        T("Lista de pokemones:")
+        for each ($pokemon : $pokemones) {
+            <item>[
+                T("- $pokemon")
+            ]
+        }
+    ]
+}
+
+/* Componente con for track y empty */
+ListaConIndice(array items, array descripciones) {
+    [
+        for ($item : $items, $desc : $descripciones) track $indice {
+            <fila>[
+                T("`$indice + 1`. $item - $desc")
+            ]
+        } empty {
+            T<vacio>("No hay elementos disponibles")
+        }
+    ]
+}
+
+/* Componente con if anidado */
+PanelAcceso(string rol, bool autenticado) {
+    [
+        if ($autenticado) {
+            if ($rol == "admin") {
+                <panel-admin>[
+                    T("Panel de administrador")
+                ]
+            } else ($rol == "user") {
+                <panel-usuario>[
+                    T("Panel de usuario")
+                ]
+            } else {
+                <panel-otro>[
+                    T("Rol no reconocido: $rol")
+                ]
+            }
+        } else {
+            T<login>("Por favor inicia sesion")
+        }
+    ]
+}
+
+/* Componente con switch string */
+InsigniaEstado(string estado) {
+    Switch($estado) {
+        case "activo" {
+            T<verde>("Estado: Activo")
+        },
+        case "inactivo" {
+            T<rojo>("Estado: Inactivo")
+        },
+        case "pendiente" {
+            T<amarillo>("Estado: Pendiente")
+        },
+        default {
+            T("Estado desconocido: $estado")
         }
     }
+}
+
+/* Componente con switch entero */
+NivelDificultad(int nivel) {
+    Switch($nivel) {
+        case 1 {
+            T("Facil")
+        },
+        case 2 {
+            T("Medio")
+        },
+        case 3 {
+            T("Dificil")
+        },
+        default {
+            T("Nivel: `$nivel + 0`")
+        }
+    }
+}
+
+/* Componente complejo combinado */
+Dashboard(string usuario, int total, array notificaciones, bool alertas) {
+    [
+        <encabezado>[
+            T<bienvenida>("Bienvenido, $usuario")
+            T("Total de registros: `$total + 0`")
+        ]
+
+        if ($alertas) {
+            <caja-alertas>[
+                T<titulo-alerta>("Tienes notificaciones pendientes:")
+                for each ($notif : $notificaciones) {
+                    T<notif-item>("• $notif")
+                }
+            ]
+        } else {
+            T<sin-alertas>("Todo en orden, sin alertas.")
+        }
+
+        <resumen>[[
+            [[
+                [[ T("Usuario") ]]
+                [[ T("Total") ]]
+            ]]
+            [[
+                [[ T("$usuario") ]]
+                [[ T("`$total + 0`") ]]
+            ]]
+        ]]
+    ]
 }
