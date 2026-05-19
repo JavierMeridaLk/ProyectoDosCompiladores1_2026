@@ -256,8 +256,7 @@ lista_parametros
         { $$ = [{ tipo: $1, id: $2, linea: @2.first_line }]; }
     ;
 
-/* Instrucciones válidas dentro de una función:
-   solo execute, load — no se permiten funciones anidadas */
+//instrucicones
 instrucciones_funcion
     : instrucciones_funcion instruccion_funcion
         { if ($2) $1.push($2); $$ = $1; }
@@ -427,7 +426,6 @@ lista_cases
 caso_switch
     : CASE expresion ':' instrucciones_main BREAK ';'
         { $$ = { val: $2, body: $4, linea: @1.first_line }; }
-    /* Fall-through: case sin cuerpo propio, comparte el del siguiente */
     | CASE expresion ':'
         { $$ = { val: $2, body: [], fallThrough: true, linea: @1.first_line }; }
     ;
@@ -547,3 +545,69 @@ expresion
     | FALSE
         { $$ = { tipo: 'BOOL', val: false, linea: @1.first_line }; }
     ;
+
+%%
+//coloreado
+
+var _Y_HL = {
+    'IMPORT':'keyword','EXECUTE':'keyword','LOAD':'keyword','FUNCTION':'keyword','MAIN':'keyword',
+    'TYPE_INT':'keyword','TYPE_FLOAT':'keyword','TYPE_STRING':'keyword','TYPE_BOOLEAN':'keyword','TYPE_CHAR':'keyword',
+    'IF':'keyword','ELSE':'keyword','SWITCH':'keyword','CASE':'keyword','DEFAULT':'keyword',
+    'WHILE':'keyword','DO':'keyword','FOR':'keyword','BREAK':'keyword','CONTINUE':'keyword',
+    'TRUE':'literal','FALSE':'literal',
+    'NUM_INT':'number','NUM_FLOAT':'number',
+    'CADENA':'string','CARACTER':'string','QUERY_SQL':'string',
+    'COMP_REF':'identifier',
+    'IDENTIFICADOR':'identifier',
+    'EQ':'operator','NEQ':'operator','LTE':'operator','GTE':'operator','AND':'operator','OR':'operator',
+    '+':'operator','-':'operator','*':'operator','/':'operator','%':'operator','!':'operator','<':'operator','>':'operator','=':'operator',
+    '{':'delimiter','}':'delimiter','[':'delimiter',']':'delimiter','(':'delimiter',')':'delimiter',
+    ';':null,',':null,':':null,
+    'EOF':null
+};
+
+function _yLexSeg(seg, offset) {
+    var out = [], lex = parser.lexer, eofId = parser.symbols_['EOF'] || 1;
+    lex.yy = { errores: [] };
+    lex.setInput(seg);
+    try {
+        var tok, name, cls;
+        while (true) {
+            tok = lex.lex();
+            if (!tok || tok === 1 || tok === eofId || lex.done) break;
+            name = parser.terminals_[tok] || ('' + tok);
+            cls = _Y_HL[name];
+            if (cls === undefined) cls = 'identifier';
+            if (cls !== null)
+                out.push({ startIndex: offset + (lex.yylloc ? lex.yylloc.first_column : 0), scopes: cls });
+        }
+    } catch(e) {}
+    return out;
+}
+
+parser.tokenizeLine = function(line, inBlockComment) {
+    var tokens = [], inCmt = !!inBlockComment, i = 0, LC = '#';
+    while (i <= line.length) {
+        if (inCmt) {
+            var close = line.indexOf('*/', i);
+            tokens.push({ startIndex: i, scopes: 'comment' });
+            if (close === -1) return { tokens: tokens, endState: true };
+            i = close + 2; inCmt = false; continue;
+        }
+        var bS = line.indexOf('/*', i);
+        var lS = LC ? line.indexOf(LC, i) : -1;
+        var nxt = -1, nt = '';
+        if (bS !== -1) { nxt = bS; nt = 'block'; }
+        if (lS !== -1 && (nxt === -1 || lS < nxt)) { nxt = lS; nt = 'line'; }
+        var cEnd = nxt === -1 ? line.length : nxt;
+        if (cEnd > i) tokens = tokens.concat(_yLexSeg(line.substring(i, cEnd), i));
+        if (nxt === -1) break;
+        tokens.push({ startIndex: nxt, scopes: 'comment' });
+        if (nt === 'line') break;
+        var ca = line.indexOf('*/', nxt + 2);
+        if (ca === -1) { inCmt = true; break; }
+        i = ca + 2;
+    }
+    return { tokens: tokens, endState: inCmt };
+};
+if (typeof window !== 'undefined') window.PrincipalJison = { parser: parser };

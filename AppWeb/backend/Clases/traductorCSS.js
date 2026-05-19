@@ -1,14 +1,13 @@
 'use strict';
 
 /**
- * traductorCSS.js
  * Traductor del lenguaje .styles → CSS válido
  */
 
 const StylesParser = require('../Analizadores/StylesJison');
 const ErrorLSS     = require('./Errores');
 
-/* ── Tabla de símbolos local para variables del @for ── */
+//Tabla de símbolos para el for
 class TablaSimbolosCSS {
     constructor(padre = null) {
         this.simbolos = new Map();
@@ -22,9 +21,7 @@ class TablaSimbolosCSS {
     }
 }
 
-/* ════════════════════════════════════════════════════════════
-   PROPIEDADES QUE NO LLEVAN UNIDAD px
-   ════════════════════════════════════════════════════════════ */
+//propoieedades sin valores o px 
 const PROPS_SIN_UNIDAD = new Set([
     'color', 'background-color',
     'font-family', 'text-align',
@@ -36,64 +33,63 @@ const PROPS_SIN_UNIDAD = new Set([
     'border-bottom-color', 'border-left-color',
 ]);
 
-/* ════════════════════════════════════════════════════════════
-   MAPA: token Jison → propiedad CSS
-   ════════════════════════════════════════════════════════════ */
+//mapeado de propiedades para css
 const MAPA_PROPIEDADES = {
     // Dimensiones
-    'height'         : 'height',
-    'width'          : 'width',
-    'min-width'      : 'min-width',
-    'max-width'      : 'max-width',
-    'min-height'     : 'min-height',
-    'max-height'     : 'max-height',
+    'height'          : 'height',
+    'width'           : 'width',
+    'min-width'       : 'min-width',
+    'max-width'       : 'max-width',
+    'min-height'      : 'min-height',
+    'max-height'      : 'max-height',
     // Texto
-    'text size'      : 'font-size',
-    'text font'      : 'font-family',
-    'text align'     : 'text-align',
+    'text size'       : 'font-size',
+    'text font'       : 'font-family',
+    'text align'      : 'text-align',
     // Fondo y color
     'background color': 'background-color',
-    'color'          : 'color',
+    'color'           : 'color',
     // Padding
-    'padding'        : 'padding',
-    'padding-left'   : 'padding-left',
-    'padding-right'  : 'padding-right',
-    'padding-top'    : 'padding-top',
-    'padding-bottom' : 'padding-bottom',
+    'padding'         : 'padding',
+    'padding-left'    : 'padding-left',
+    'padding-right'   : 'padding-right',
+    'padding-top'     : 'padding-top',
+    'padding-bottom'  : 'padding-bottom',
     // Margin
-    'margin'         : 'margin',
-    'margin-left'    : 'margin-left',
-    'margin-right'   : 'margin-right',
-    'margin-top'     : 'margin-top',
-    'margin-bottom'  : 'margin-bottom',
+    'margin'          : 'margin',
+    'margin-left'     : 'margin-left',
+    'margin-right'    : 'margin-right',
+    'margin-top'      : 'margin-top',
+    'margin-bottom'   : 'margin-bottom',
     // Border genérico
-    'border'         : 'border',
-    'border-radius'  : 'border-radius',
-    'border-width'   : 'border-width',
-    'border-style'   : 'border-style',
-    'border-color'   : 'border-color',
-    // Border por lado
-    'border-top'           : 'border-top',
-    'border-right'         : 'border-right',
-    'border-bottom'        : 'border-bottom',
-    'border-left'          : 'border-left',
-    'border-top-style'     : 'border-top-style',
-    'border-right-style'   : 'border-right-style',
-    'border-bottom-style'  : 'border-bottom-style',
-    'border-left-style'    : 'border-left-style',
-    'border-top-color'     : 'border-top-color',
-    'border-right-color'   : 'border-right-color',
-    'border-bottom-color'  : 'border-bottom-color',
-    'border-left-color'    : 'border-left-color',
-    'border-top-width'     : 'border-top-width',
-    'border-right-width'   : 'border-right-width',
-    'border-bottom-width'  : 'border-bottom-width',
-    'border-left-width'    : 'border-left-width',
+    'border'          : 'border',
+    'border-radius'   : 'border-radius',
+    'border-width'    : 'border-width',
+    'border-style'    : 'border-style',
+    'border-color'    : 'border-color',
+    // Border por lado — shorthand
+    'border-top'      : 'border-top',
+    'border-right'    : 'border-right',
+    'border-bottom'   : 'border-bottom',
+    'border-left'     : 'border-left',
+    // Border por lado — style
+    'border-top-style'    : 'border-top-style',
+    'border-right-style'  : 'border-right-style',
+    'border-bottom-style' : 'border-bottom-style',
+    'border-left-style'   : 'border-left-style',
+    // Border por lado — color
+    'border-top-color'    : 'border-top-color',
+    'border-right-color'  : 'border-right-color',
+    'border-bottom-color' : 'border-bottom-color',
+    'border-left-color'   : 'border-left-color',
+    // Border por lado — width
+    'border-top-width'    : 'border-top-width',
+    'border-right-width'  : 'border-right-width',
+    'border-bottom-width' : 'border-bottom-width',
+    'border-left-width'   : 'border-left-width',
 };
 
-/* ════════════════════════════════════════════════════════════
-   CLASE PRINCIPAL
-   ════════════════════════════════════════════════════════════ */
+//clase principal del traductor
 class TraductorCSS {
 
     /**
@@ -117,13 +113,13 @@ class TraductorCSS {
         let ast       = null;
         const errores = [];
 
-        /* ── Fase 1: Parseo ── */
+        //parseo
         try {
             const resultado = StylesParser.parse(entrada);
             ast             = resultado?.ast ?? null;
             const rawErrs   = parserObj.yy.errores ?? [];
 
-            // Convertir errores crudos del Jison → ErrorLSS
+            //manejo de errorwes
             rawErrs.forEach(e => {
                 errores.push(new ErrorLSS(
                     e.tipo        ?? 'Desconocido',
@@ -134,7 +130,7 @@ class TraductorCSS {
             });
 
         } catch (e) {
-            // Error fatal (el parser lanzó excepción)
+            // Error fatal 
             errores.push(new ErrorLSS(
                 'Fatal',
                 `Error crítico de parseo: ${e.message}`,
@@ -155,7 +151,7 @@ class TraductorCSS {
             };
         }
 
-        /* ── Fase 2: Traducción ── */
+        //Traducción 
         const estilosBase = {};
         const globalTS    = new TablaSimbolosCSS();
 
@@ -175,7 +171,7 @@ class TraductorCSS {
         return { css, errores, tablaSimbolos };
     }
 
-    /* ── Genera CSS a partir de una lista de nodos ── */
+    //Genera CSS a partir de una lista de nodos
     static _generarCSS(nodos, ts, estilosBase) {
         let css        = '';
         const erroresSem = [];
@@ -196,7 +192,7 @@ class TraductorCSS {
         return { css, erroresSem };
     }
 
-    /* ── Procesa una regla de estilo ── */
+    //Procesa una regla de estilo
     static _procesarRegla(regla, ts, estilosBase) {
         const errores = [];
 
@@ -207,7 +203,7 @@ class TraductorCSS {
 
         const mapaProps = new Map();
 
-        // 1. Herencia: cargar propiedades del padre primero
+        // Herencia: cargar propiedades del padre primero
         if (regla.extiende) {
             const padre = estilosBase[regla.extiende];
             if (padre) {
@@ -222,7 +218,7 @@ class TraductorCSS {
             }
         }
 
-        // 2. Propiedades propias (sobreescriben al padre)
+        //Propiedades propias 
         for (const p of regla.propiedades) {
             if (p) mapaProps.set(p.propiedad, p.valor);
         }
@@ -231,7 +227,7 @@ class TraductorCSS {
         estilosBase[nombreResuelto] = Array.from(mapaProps.entries())
             .map(([prop, val]) => ({ propiedad: prop, valor: val }));
 
-        // 3. Generar bloque CSS
+        // Generar bloque CSS
         let bloque = `${selector} {\n`;
         for (const [prop, valorRaw] of mapaProps.entries()) {
             const propCSS    = this._mapearPropiedad(prop);
@@ -243,7 +239,7 @@ class TraductorCSS {
         return { css: bloque, errores };
     }
 
-    /* ── @for ── */
+    // @for
     static _procesarFor(nodo, ts, estilosBase) {
         let css        = '';
         const errores  = [];
@@ -272,7 +268,7 @@ class TraductorCSS {
         return { css, errores };
     }
 
-    /* ── Resuelve variables $i en nombres de selectores ── */
+    // Resuelve variables $i en nombres de selectores
     static _resolverNombre(selector, ts) {
         return selector.replace(/\$[a-zA-Z0-9_]+/g, match => {
             const val = ts.get(match);
@@ -280,7 +276,7 @@ class TraductorCSS {
         });
     }
 
-    /* ── Convierte el valor AST a string CSS ── */
+    // Convierte el valor AST a string CSS
     static _resolverValor(valor, ts, propCSS) {
         // Valor rgb()
         if (valor?.tipo === 'rgb') {
@@ -303,7 +299,7 @@ class TraductorCSS {
             return this._traducirBorderKind(valor);
         }
 
-        // Evaluar expresión numérica o constante
+        // Evaluar expresion numerixa o constante
         const resultado = this._evaluar(valor, ts);
 
         if (typeof resultado === 'number') {
@@ -314,7 +310,7 @@ class TraductorCSS {
         return this._normalizarStringValor(String(resultado), propCSS);
     }
 
-    /* ── Normaliza strings: fuentes en mayúsculas, colores en minúsculas ── */
+    //formateo de strings para CSS  
     static _normalizarStringValor(valor, propCSS) {
         if (propCSS === 'font-family') {
             const fontMap = {
@@ -329,7 +325,7 @@ class TraductorCSS {
         if (propCSS === 'text-align') {
             return valor.toLowerCase();
         }
-        // Porcentajes se devuelven tal cual
+        // Porcentajes se devuelven 
         if (valor.endsWith('%')) return valor;
         return valor.toLowerCase();
     }
@@ -347,7 +343,7 @@ class TraductorCSS {
         }
     }
 
-    /* ── Evalúa una expresión del AST a un valor primitivo ── */
+    // Evalúa una expresión del AST a un valor primitivo
     static _evaluar(expr, ts) {
         if (typeof expr === 'number') return expr;
 

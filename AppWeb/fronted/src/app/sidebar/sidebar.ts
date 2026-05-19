@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IdeService, FileNode } from '../ide.service';
 
@@ -18,17 +18,21 @@ export class Sidebar implements OnInit {
 
   draggedNode: FileNode | null = null;
 
-  constructor(private ide: IdeService) {}
+  constructor(private ide: IdeService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
-    this.ide.rootName.subscribe(name => this.rootName = name);
-    this.ide.rootOpen.subscribe(open => this.rootOpen = open);
-
+    this.ide.rootName.subscribe(name => {
+      this.rootName = name;
+      this.hasProject = !!name;
+      this.cdr.markForCheck();
+    });
+    this.ide.rootOpen.subscribe(open => {
+      this.rootOpen = open;
+      this.cdr.markForCheck();
+    });
     this.ide.fileTree.subscribe(tree => {
       this.tree = this.assignDepth(tree, 0);
-    });
-    this.ide.rootName.subscribe(() => {
-      this.hasProject = true;
+      this.cdr.markForCheck();
     });
   }
 
@@ -85,18 +89,18 @@ export class Sidebar implements OnInit {
 
   // EXTENSIONES
   if (node.name.endsWith('.y')) {
-    return '🧠'; // lógica principal
+    return '🧠'; 
   }
 
   if (node.name.endsWith('.comp')) {
-    return '🧩'; // componentes
+    return '🧩'; 
   }
 
   if (node.name.endsWith('.styles')) {
-    return '🎨'; // estilos
+    return '🎨';
   }
 
-  return '📄'; // default
+  return '📄'; 
 }
 
 async createFile(node: any, event: Event) {

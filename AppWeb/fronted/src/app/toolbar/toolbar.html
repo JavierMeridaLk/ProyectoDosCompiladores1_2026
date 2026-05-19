@@ -1,50 +1,62 @@
 <div class="toolbar">
 
+  <!-- BRAND -->
   <div class="brand">
-    <img src="assets/logo.png" width="60" />
-    {{ ideName }}
+    <img src="assets/logo.png" height="26" />
+    <span class="brand-name">YFERA</span>
+    <span class="brand-sub">Framework</span>
   </div>
 
-  <div class="menu">
+  <!-- MENÚ IZQUIERDO -->
+  <nav class="menu">
 
-    <!-- ARCHIVO -->
-    <div class="menu-item" (click)="toggle('archivo'); $event.stopPropagation()">
+    <div class="menu-item" (click)="toggle(); $event.stopPropagation()">
       Archivo
-
       @if (menus.archivo) {
-        <div class="dropdown">
+        <div class="dropdown" (click)="$event.stopPropagation()">
 
-          <div (click)="newFile(); closeAll()">Nuevo archivo</div>
-          <div (click)="newFolder(); closeAll()">Nueva carpeta</div>
-
-          <hr />
-
-          <div (click)="newProject(); closeAll()">Nuevo proyecto</div>
-          <div (click)="loadProject(); closeAll()">Cargar proyecto</div>
-
-          <hr />
-
-          <div (click)="save(); closeAll()">Guardar</div>
-          <div (click)="saveAll(); closeAll()">Guardar todo</div>
+          <div (click)="newFile(); closeAll()">
+            <span class="dd-icon">+</span> Nuevo archivo
+          </div>
+          <div (click)="newFolder(); closeAll()">
+            <span class="dd-icon">⊞</span> Nueva carpeta
+          </div>
 
           <hr />
 
-          <div (click)="export(); closeAll()">Exportar a producción</div>
+          <div (click)="newProject(); closeAll()">
+            <span class="dd-icon">✦</span> Nuevo proyecto
+          </div>
+          <div (click)="loadProject(); closeAll()">
+            <span class="dd-icon">↑</span> Cargar proyecto
+          </div>
+
+          <hr />
+
+          <div (click)="save(); closeAll()">
+            <span class="dd-icon">◈</span> Guardar
+          </div>
+          <div (click)="saveAll(); closeAll()">
+            <span class="dd-icon">◈</span> Guardar todo
+          </div>
 
         </div>
       }
     </div>
 
-    <!-- EJECUTAR -->
-    <div class="menu-item" (click)="run()">
-      Ejecutar
-    </div>
+  </nav>
 
-    <!-- VISTA PREVIA -->
-    <div class="menu-item" (click)="preview()">
-      Vista previa
-    </div>
+  <!-- SPACER -->
+  <div class="toolbar-spacer"></div>
 
+  <!-- ACCIONES DERECHAS -->
+  <div class="actions">
+    <button class="btn-preview" (click)="preview()" title="Abrir vista previa">
+      ◈ Vista previa
+    </button>
+    <button class="btn-run" (click)="run()" title="Compilar y exportar">
+      ▶ Ejecutar
+    </button>
   </div>
 
 </div>

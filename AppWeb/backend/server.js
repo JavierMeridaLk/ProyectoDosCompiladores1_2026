@@ -5,6 +5,7 @@ const cors         = require('cors');
 const Motor        = require('./Clases/motor');
 const DBExecutor   = require('./Clases/dbExecutor');
 const TraductorDB  = require('./Clases/traductorDB');
+const database     = require('./Clases/database');
 
 const app = express();
 app.use(cors());
@@ -22,10 +23,15 @@ app.post('/compile', async (req, res) => {
             return res.status(400).json({ error: 'Se esperaba un array de archivos' });
         }
 
+        // Mapa en memoria
+        const archivosEnMemoria = new Map(
+            files.map(f => [f.path.replace(/\\/g, '/'), f.content])
+        );
+
         const results = [];
 
         for (const f of files) {
-            const r = await Motor.ejecutarDesdeContenido(f.path, f.content);
+            const r = await Motor.ejecutarDesdeContenido(f.path, f.content, archivosEnMemoria);
             results.push({ file: f.path, ...r });
         }
 
@@ -36,14 +42,10 @@ app.post('/compile', async (req, res) => {
     }
 });
 
-// =======================================
-// EJECUTAR SQL EN LA BASE DE DATOS
-// =======================================
+// ejecucion de la db
 
 app.post('/execute-db', async (req, res) => {
     try {
-        // NOTA: 'query' ya viene con las variables interpoladas desde el frontend 
-        // gracias a los template literals de JS (evaluados antes del fetch).
         const { query } = req.body;
 
         if (!query || !query.trim()) {
@@ -58,68 +60,7 @@ app.post('/execute-db', async (req, res) => {
     }
 });
 
-// =======================================
-// EXECUTE-Y — traduce sintaxis .y a SQL y ejecuta
-// =======================================
-// Sintaxis soportada (los $vars ya vienen interpolados por JS):
-//   tabla.columna           → SELECT columna FROM tabla
-//   tabla[c=v, c=v]         → INSERT INTO tabla (c,c) VALUES (v,v)
-//   tabla[c=v] IN id        → UPDATE tabla SET c=v WHERE id=id
-//   tabla DELETE id         → DELETE FROM tabla WHERE id=id
-
-function _parsearAsignaciones(str) {
-    const result = [];
-    // Regex que respeta cadenas entre comillas
-    const re = /(\w+)\s*=\s*("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|[^,]+?)(?:\s*,\s*(?=\w+\s*=)|$)/g;
-    let m;
-    while ((m = re.exec(str)) !== null) {
-        result.push({ col: m[1].trim(), val: m[2].trim() });
-    }
-    return result;
-}
-
-function _sqlVal(v) {
-    if (v === null || v === undefined || v.toLowerCase() === 'null') return 'NULL';
-    if (v.toLowerCase() === 'true')  return '1';
-    if (v.toLowerCase() === 'false') return '0';
-    if (/^-?\d+(\.\d+)?$/.test(v))  return v;
-    // Quitar comillas externas si ya las tiene
-    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
-        v = v.slice(1, -1);
-    }
-    return `'${v.replace(/'/g, "''")}'`;
-}
-
-function traducirQueryY(q) {
-    q = q.trim();
-
-    // tabla.columna  →  SELECT columna FROM tabla
-    const mSel = q.match(/^(\w+)\.(\w+)$/);
-    if (mSel) return `SELECT ${mSel[2]} FROM ${mSel[1]}`;
-
-    // tabla DELETE id  →  DELETE FROM tabla WHERE id=id
-    const mDel = q.match(/^(\w+)\s+DELETE\s+(.+)$/i);
-    if (mDel) return `DELETE FROM ${mDel[1]} WHERE id=${_sqlVal(mDel[2].trim())}`;
-
-    // tabla[...] IN id  →  UPDATE
-    const mUpd = q.match(/^(\w+)\[(.+)\]\s+IN\s+(\S+)$/);
-    if (mUpd) {
-        const sets = _parsearAsignaciones(mUpd[2])
-            .map(a => `${a.col} = ${_sqlVal(a.val)}`).join(', ');
-        return `UPDATE ${mUpd[1]} SET ${sets} WHERE id=${_sqlVal(mUpd[3])}`;
-    }
-
-    // tabla[...]  →  INSERT
-    const mIns = q.match(/^(\w+)\[(.+)\]$/);
-    if (mIns) {
-        const asigs = _parsearAsignaciones(mIns[2]);
-        const cols  = asigs.map(a => a.col).join(', ');
-        const vals  = asigs.map(a => _sqlVal(a.val)).join(', ');
-        return `INSERT INTO ${mIns[1]} (${cols}) VALUES (${vals})`;
-    }
-
-    return q; // fallback: asumir SQL puro
-}
+// ttraduccin de bd en .y
 
 app.post('/execute-y', async (req, res) => {
     try {
@@ -128,7 +69,26 @@ app.post('/execute-y', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Query vacía' });
         }
 
-        const sql = traducirQueryY(query);
+        const traduccion = await TraductorDB.analizar(query, false, database);
+        let sql          = traduccion.sql ?? '';
+        let errores      = traduccion.errores ?? [];
+
+        const sqlUtil       = sql.trim() && !sql.startsWith('--');
+        const tieneSemantic = errores.some(e => e.tipo === 'Semántico');
+
+        if (!sqlUtil) {
+            if (tieneSemantic) {
+                const msg = errores.map(e => e.descripcion).join('; ');
+                return res.json({ ok: false, sql: '', error: msg, rows: [] });
+            }
+            sql = query.trim();
+        } else if (tieneSemantic) {
+            const msg = errores
+                .filter(e => e.tipo === 'Semántico')
+                .map(e => e.descripcion)
+                .join('; ');
+            return res.json({ ok: false, sql, errores, error: msg, rows: [] });
+        }
 
         let rows = [];
         try {
@@ -144,9 +104,7 @@ app.post('/execute-y', async (req, res) => {
     }
 });
 
-// =======================================
-// TERMINAL DB — traduce .db y ejecuta
-// =======================================
+// logica de la terminal para la traduccion de la base de datos
 
 app.post('/db-terminal', async (req, res) => {
     try {
@@ -155,16 +113,15 @@ app.post('/db-terminal', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Query vacía' });
         }
 
-        // Intentar traducir con el lenguaje .db
-        const traduccion = await TraductorDB.analizar(query, false);
+        const traduccion = await TraductorDB.analizar(query, false, database);
         let sql          = traduccion.sql ?? '';
         let errores      = traduccion.errores ?? [];
 
-        // Si la traducción no produjo SQL útil (error fatal, semántico, o vacío) → SQL puro
         const sqlUtil = sql.trim() && !sql.startsWith('--');
-        if (!sqlUtil) {
-            sql    = query.trim();
-            errores = [];
+
+        if (!sqlUtil || errores.length) {
+            // retornar errores
+            return res.json({ ok: false, sql: '', errores, rows: [] });
         }
 
         // Ejecutar el SQL
@@ -187,9 +144,7 @@ app.post('/db-terminal', async (req, res) => {
     }
 });
 
-// =======================================
-// VISTA PREVIA — HTML ensamblado
-// =======================================
+// vista previa del proyecto
 
 app.post('/preview', async (req, res) => {
     try {
@@ -199,9 +154,13 @@ app.post('/preview', async (req, res) => {
             return res.status(400).send('Se esperaba un array de archivos');
         }
 
+        const archivosEnMemoria = new Map(
+            files.map(f => [f.path.replace(/\\/g, '/'), f.content])
+        );
+
         const results = [];
         for (const f of files) {
-            const r = await Motor.ejecutarDesdeContenido(f.path, f.content);
+            const r = await Motor.ejecutarDesdeContenido(f.path, f.content, archivosEnMemoria);
             results.push({ file: f.path, ...r });
         }
 
@@ -214,9 +173,7 @@ app.post('/preview', async (req, res) => {
     }
 });
 
-// =======================================
-// EXPORTAR — Carpeta de producción
-// =======================================
+// caragr carpetad e archivos
 
 app.post('/export', async (req, res) => {
     try {
@@ -226,9 +183,13 @@ app.post('/export', async (req, res) => {
             return res.status(400).json({ ok: false, error: 'Se esperaba un array de archivos' });
         }
 
+        const archivosEnMemoria = new Map(
+            files.map(f => [f.path.replace(/\\/g, '/'), f.content])
+        );
+
         const results = [];
         for (const f of files) {
-            const r = await Motor.ejecutarDesdeContenido(f.path, f.content);
+            const r = await Motor.ejecutarDesdeContenido(f.path, f.content, archivosEnMemoria);
             results.push({ file: f.path, ...r });
         }
 
@@ -241,7 +202,6 @@ app.post('/export', async (req, res) => {
             });
         }
 
-        // Devuelve los contenidos; el frontend los escribe en la carpeta del proyecto
         const archivos = Motor.generarArtefactos(results, nombre ?? 'proyecto');
         res.json({ ok: true, archivos });
 

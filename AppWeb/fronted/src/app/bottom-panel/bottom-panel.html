@@ -1,63 +1,81 @@
 <div class="panel-header">
 
   <div class="panel-tab" [class.active]="activeTab === 'terminal'" (click)="activeTab = 'terminal'">
-    Terminal
+    <span class="tab-icon">⬡</span> Terminal
   </div>
 
   <div class="panel-tab" [class.active]="activeTab === 'errores'" (click)="activeTab = 'errores'">
-    Errores
+    <span class="tab-icon">⚠</span> Errores
     @if (errors.length) {
       <span class="error-badge">{{ errors.length }}</span>
     }
   </div>
 
   @if (activeTab === 'terminal' && dbHistory.length) {
-    <button class="clear-btn" (click)="clearDb()" title="Limpiar">✕</button>
+    <button class="clear-btn" (click)="clearDb()" title="Limpiar terminal">✕ Limpiar</button>
   }
 
 </div>
 
-<!-- ══════════ TERMINAL DB ══════════ -->
+<!-- Terminal para la comnicsacion con la base dee datos-->
 @if (activeTab === 'terminal') {
+
+  <div class="terminal-input">
+    <span class="prompt">db&gt;</span>
+    <input
+      [(ngModel)]="dbCommand"
+      (keydown.enter)="executeDb()"
+      [disabled]="dbLoading"
+      placeholder="Ej: TABLE pokemon COLUMNS nombre=string, tipo=string;"
+      autocomplete="off"
+      spellcheck="false"
+    />
+    @if (dbLoading) {
+      <span class="loading">
+        <span class="dot">.</span><span class="dot">.</span><span class="dot">.</span>
+      </span>
+    } @else {
+      <button class="run-btn" (click)="executeDb()" title="Ejecutar (Enter)">▶</button>
+    }
+  </div>
+
+  <!-- resultados-->
   <div class="panel-content" #terminalScroll>
 
     @if (!dbHistory.length) {
       <div class="hint">
-        Escribe en el lenguaje <strong>.db</strong> o SQL puro y presiona <kbd>Enter</kbd>.
+        Escribe en el lenguaje <strong>.db</strong> y presiona <kbd>Enter</kbd> para ejecutar.
       </div>
     }
 
     @for (entry of dbHistory; track $index) {
       <div class="db-entry">
 
-        <!-- Query ingresada -->
-        <div class="db-query">&gt; {{ entry.query }}</div>
+        <div class="db-query">
+          <span class="prompt-inline">›</span> {{ entry.query }}
+        </div>
 
-        <!-- SQL generado por el traductor -->
         @if (entry.sql && entry.sql !== entry.query) {
           <div class="db-sql-generated">
             <span class="db-sql-label">SQL →</span> {{ entry.sql }}
           </div>
         }
 
-        <!-- Errores de compilación/ejecución -->
         @if (entry.errores?.length) {
           @for (e of entry.errores; track $index) {
             <div class="db-error">
               ✗ [{{ e.tipo }}]
-              @if (e.linea) { <span>L{{ e.linea }}</span> }
+              @if (e.linea) { <span class="err-loc">L{{ e.linea }}</span> }
               {{ e.descripcion }}
             </div>
           }
         }
 
         @if (entry.error) {
-          <div class="db-error">✗  {{ entry.error }}</div>
+          <div class="db-error">✗ {{ entry.error }}</div>
         }
 
-        <!-- Resultados -->
         @for (row of entry.rows; track $index) {
-
           @if (row.tipo === 'select') {
             @if (row.resultado && row.resultado.length) {
               <table class="db-table">
@@ -82,41 +100,24 @@
               <div class="db-ok">(sin resultados)</div>
             }
           }
-
           @if (row.tipo === 'change') {
-            <div class="db-ok">✓  {{ row.changes }} fila(s) afectada(s)</div>
+            <div class="db-ok">✓ {{ row.changes }} fila(s) afectada(s)</div>
           }
-
         }
+
       </div>
     }
 
   </div>
-
-  <div class="terminal-input">
-    <span class="prompt">db&gt;</span>
-    <input
-      [(ngModel)]="dbCommand"
-      (keydown.enter)="executeDb()"
-      [disabled]="dbLoading"
-      placeholder="TABLE producto COLUMNS nombre=string, precio=float;"
-      autocomplete="off"
-      spellcheck="false"
-    />
-    @if (dbLoading) {
-      <span class="loading">…</span>
-    }
-  </div>
 }
 
-<!-- ══════════ ERRORES ══════════ -->
+<!-- apartadoi de errores-->
 @if (activeTab === 'errores') {
   <div class="panel-content">
-
     @if (compiling) {
-      <div class="hint">Compilando...</div>
+      <div class="hint"><span class="hint-icon">⏳</span> Compilando...</div>
     } @else if (!errors.length) {
-      <div class="hint no-errors">✓  Sin errores</div>
+      <div class="hint no-errors"><span class="hint-icon">✓</span> Sin errores de compilación</div>
     } @else {
       <table class="error-table">
         <thead>
@@ -141,6 +142,5 @@
         </tbody>
       </table>
     }
-
   </div>
 }

@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IdeService } from '../ide.service';
 
@@ -18,7 +18,12 @@ export class Toolbar {
 
   constructor(private ide: IdeService) {}
 
-  toggle(menu: string) {
+  @HostListener('document:click')
+  onDocumentClick() {
+    this.closeAll();
+  }
+
+  toggle() {
     this.menus.archivo = !this.menus.archivo;
   }
 
@@ -78,12 +83,9 @@ export class Toolbar {
   async run() {
     this.closeAll();
     await this.ide.compileProject();
-  }
-  // ... tus otros métodos (save, saveAll, run, etc.)
-
-  async export() {
-    this.closeAll();
-    await this.ide.exportProject();
+    if (this.ide.compileErrors.value.length === 0) {
+      await this.ide.exportProject();
+    }
   }
 
   async preview() {

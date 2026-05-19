@@ -1,7 +1,6 @@
 'use strict';
 
 /**
- * traductorComponentes.js
  * Traductor del lenguaje .comp → JavaScript (template literals HTML)
  */
 
@@ -64,7 +63,7 @@ class TraductorComponentes {
         let ast    = [];
         const errores = [];
 
-        /* ── Fase 1: Parseo ── */
+        //Parseo
         try {
             const resultado = Parser.parse(entrada);
             ast             = resultado?.ast ?? [];
@@ -89,7 +88,7 @@ class TraductorComponentes {
             return { js: '// Error crítico: no se pudo parsear el archivo .comp', errores };
         }
 
-        /* ── Fase 2: Traducción + análisis semántico ── */
+        //Traducción y análisis semántico
         const entornoGlobal = new Entorno();
         const erroresSem    = [];
 
@@ -110,7 +109,7 @@ class TraductorComponentes {
         return { js, errores, tablaSimbolos };
     }
 
-    /* ── Genera la función JS de un componente ── */
+    //genraciond e fucniones en js
     static _generarComponente(comp, entornoPadre, erroresSem) {
         const nombre      = comp.id;
         const entorno     = new Entorno(entornoPadre);
@@ -125,12 +124,20 @@ class TraductorComponentes {
             .map(p => TraductorComponentes._limpiarVar(p.id))
             .join(', ');
 
+        const fnAssignments = comp.params
+            .filter(p => p.tipo === 'function')
+            .map(p => {
+                const id = TraductorComponentes._limpiarVar(p.id);
+                return `    if (typeof ${id} === 'function') window.${id} = ${id};`;
+            })
+            .join('\n');
+
         const body = TraductorComponentes._generarElementos(comp.body, entorno, erroresSem);
 
         return (
 `// ── Componente: ${nombre} ──
 function ${nombre}(${params}) {
-    return \`
+${fnAssignments ? fnAssignments + '\n' : ''}    return \`
 ${TraductorComponentes._indentar(body, 2)}
     \`;
 }
@@ -138,24 +145,23 @@ ${TraductorComponentes._indentar(body, 2)}
         );
     }
 
-    /* ── Genera HTML de una lista de elementos ── */
+    //Genera HTML de una lista de elementos
     static _generarElementos(elementos, entorno, erroresSem) {
-        // 1. Si es nulo o indefinido, usamos un arreglo vacío
+        // Si es nulo o indefinido, usamos un arreglo vacío
         let arregloSeguro = elementos ?? [];
         
-        // 2. Si es un objeto individual (no un arreglo), lo metemos en uno
+        // Si es un objeto individual (no un arreglo), lo metemos en uno
         if (!Array.isArray(arregloSeguro)) {
             arregloSeguro = [arregloSeguro];
         }
 
-        // 3. Ahora podemos filtrar y mapear sin miedo a que explote
         return arregloSeguro
             .filter(Boolean)
             .map(el => TraductorComponentes._generarElemento(el, entorno, erroresSem))
             .join('\n');
     }
 
-    /* ── Despacho por tipo de nodo ── */
+    /* traduccion con switch*/
     static _generarElemento(el, entorno, erroresSem) {
         switch (el.tipo) {
             case 'SECTION':      return TraductorComponentes._generarSection(el, entorno, erroresSem);
@@ -210,20 +216,27 @@ ${TraductorComponentes._indentar(body, 2)}
     }
 
     static _generarIMG(el, entorno, erroresSem) {
-        const cls  = TraductorComponentes._claseAttr(el.estilos);
         const urls = el.urls ?? [];
+        const tieneClases = el.estilos?.length > 0;
 
         if (urls.length === 1) {
             const src = TraductorComponentes._resolverUrl(urls[0], entorno, erroresSem);
-            return `<img${cls} src="${src}" alt="" />`;
+            if (tieneClases) {
+                const cls = TraductorComponentes._claseAttr(el.estilos);
+                return `<div${cls}>\n  <img src="${src}" alt="" style="width:100%;height:100%;display:block;object-fit:cover;" />\n</div>`;
+            }
+            return `<img src="${src}" alt="" />`;
         }
 
         // Carrusel
+        const clsCarousel = tieneClases
+            ? ` class="${[...el.estilos, 'carousel'].join(' ')}"`
+            : ` class="carousel"`;
         const imgs = urls.map(u => {
             const src = TraductorComponentes._resolverUrl(u, entorno, erroresSem);
             return `    <img src="${src}" alt="" />`;
         }).join('\n');
-        return `<div${cls} class="carousel">\n${imgs}\n</div>`;
+        return `<div${clsCarousel}>\n${imgs}\n</div>`;
     }
 
     static _resolverUrl(urlNodo, entorno, erroresSem) {
@@ -244,28 +257,30 @@ ${TraductorComponentes._indentar(body, 2)}
         const cls    = TraductorComponentes._claseAttr(el.estilos);
         const cuerpo = TraductorComponentes._generarElementos(el.body, entorno, erroresSem);
         const submit = el.submit ? TraductorComponentes._generarSubmit(el.submit, entorno, erroresSem) : '';
-        return `<form${cls}>\n${TraductorComponentes._indentar(cuerpo, 1)}\n${submit}\n</form>`;
+        const partes = [TraductorComponentes._indentar(cuerpo, 1)];
+        if (submit) partes.push(TraductorComponentes._indentar(submit, 1));
+        return `<form${cls}>\n${partes.join('\n')}\n</form>`;
     }
 
     static _generarSubmit(sub, entorno, erroresSem) {
         const cls   = TraductorComponentes._claseAttr(sub.estilos);
         const props = TraductorComponentes._propsSubmitMap(sub.props);
 
-        const labelVal = props.get('label');
-        const label    = labelVal ? TraductorComponentes._resolverValor(labelVal, entorno, erroresSem) : 'Enviar';
+        const labelProp = props.get('label');
+        const label     = labelProp ? TraductorComponentes._resolverValor(labelProp.valor, entorno, erroresSem) : 'Enviar';
 
         let onClick = '';
         const funcProp = props.get('function');
         if (funcProp) {
             const funcId = TraductorComponentes._limpiarVar(funcProp.func);
-            TraductorComponentes._validarVar(funcId, entorno, erroresSem, funcProp.func, sub.linea ?? 0);
+
             const refs = (funcProp.refs ?? [])
                 .map(r => `document.getElementById('${r.substring(1)}')?.value`)
                 .join(', ');
             onClick = ` onclick="${funcId}(${refs})"`;
         }
 
-        return `    <button type="button"${cls}${onClick}>${label}</button>`;
+        return `<button type="button"${cls}${onClick}>${label}</button>`;
     }
 
     static _generarInput(el, entorno, erroresSem) {
@@ -276,10 +291,10 @@ ${TraductorComponentes._indentar(body, 2)}
         const labelVal = props.get('label');
         const valVal   = props.get('value');
 
-        const idStr    = idVal    ? ` id="${idVal}"`       : '';
-        const nameStr  = idVal    ? ` name="${idVal}"`     : '';
+        const idStr    = idVal ? ` id="${idVal}"`   : '';
+        const nameStr  = idVal ? ` name="${idVal}"` : '';
         const labelHtml = labelVal
-            ? `<label${idVal ? ` for="${idVal}"` : ''}>${labelVal}</label>\n`
+            ? `<label${idVal ? ` for="${idVal}"` : ''}>${labelVal}</label>\n  `
             : '';
 
         let type  = 'text';
@@ -292,19 +307,16 @@ ${TraductorComponentes._indentar(body, 2)}
             type  = 'checkbox';
             extra = (String(valVal) === 'true') ? ' checked' : '';
         } else {
-            // INPUT_TEXT
             const textoVal = valVal !== undefined
                 ? TraductorComponentes._procesarTexto(`"${valVal}"`, entorno, erroresSem)
                 : '';
             extra = textoVal ? ` value="${textoVal}"` : '';
         }
 
-        return `${labelHtml}<input type="${type}"${idStr}${nameStr}${cls}${extra} />`;
+        return `<div class="__lss-field">\n  ${labelHtml}<input type="${type}"${idStr}${nameStr}${cls}${extra} />\n</div>`;
     }
 
-    /* ══════════════════════════════════════════════════
-       LÓGICA
-       ══════════════════════════════════════════════════ */
+    //logica
 
     static _generarIf(el, entorno, erroresSem) {
         const cond     = TraductorComponentes._expr(el.cond, entorno, erroresSem);
@@ -329,45 +341,48 @@ ${TraductorComponentes._indentar(body, 2)}
     }
 
     static _generarForEach(el, entorno, erroresSem) {
-        const item   = TraductorComponentes._limpiarVar(el.iterador);
-        const colId  = TraductorComponentes._limpiarVar(el.coleccion);
+        // En el AST: iterador = el ARRAY declarado, coleccion = la variable de cada elemento
+        const colId = TraductorComponentes._limpiarVar(el.iterador); 
+        const item  = TraductorComponentes._limpiarVar(el.coleccion); 
 
-        // Validar que la colección esté declarada
-        TraductorComponentes._validarVar(colId, entorno, erroresSem, el.coleccion, el.linea ?? 0);
+        // Validar que el array esté declarado como parámetro
+        TraductorComponentes._validarVar(colId, entorno, erroresSem, el.iterador, el.linea ?? 0);
 
         const entornoLocal = new Entorno(entorno);
-        entornoLocal.guardar(item, 'any', el.linea);
+        entornoLocal.guardar(item, 'any', el.linea); 
 
         const body = TraductorComponentes._generarElementos(el.body, entornoLocal, erroresSem);
         return `\${ (${colId} ?? []).map(${item} => \`\n${body}\n\`).join('') }`;
     }
 
     static _generarForTrack(el, entorno, erroresSem) {
-        const trackId = TraductorComponentes._limpiarVar(el.trackVar); 
+
+        const trackId = TraductorComponentes._limpiarVar(el.trackVar);
         const pares   = el.vars ?? [];
         if (pares.length === 0) return '';
 
         const principal = pares[0];
-        const colId     = TraductorComponentes._limpiarVar(principal.coleccion);
-        const itemId    = TraductorComponentes._limpiarVar(principal.iterador);
+        const colId     = TraductorComponentes._limpiarVar(principal.iterador);
+        const itemId    = TraductorComponentes._limpiarVar(principal.coleccion);
 
-        TraductorComponentes._validarVar(colId, entorno, erroresSem, principal.coleccion, el.linea ?? 0);
+        TraductorComponentes._validarVar(colId, entorno, erroresSem, principal.iterador, el.linea ?? 0);
 
         const entornoLocal = new Entorno(entorno);
         entornoLocal.guardar(itemId,  'any', el.linea);
-        entornoLocal.guardar(trackId, 'int', el.linea); 
+        entornoLocal.guardar(trackId, 'int', el.linea);
 
         pares.slice(1).forEach(p => {
-            const secId  = TraductorComponentes._limpiarVar(p.coleccion);
-            const secItem = TraductorComponentes._limpiarVar(p.iterador);
-            TraductorComponentes._validarVar(secId, entorno, erroresSem, p.coleccion, el.linea ?? 0);
+            const secId   = TraductorComponentes._limpiarVar(p.iterador); 
+            const secItem = TraductorComponentes._limpiarVar(p.coleccion); 
+            TraductorComponentes._validarVar(secId, entorno, erroresSem, p.iterador, el.linea ?? 0);
             entornoLocal.guardar(secItem, 'any', el.linea);
         });
 
+        // Cada array secundario se accede por el mismo índice del principal
         const secAcceso = pares.slice(1).map(p => {
-            const secId   = TraductorComponentes._limpiarVar(p.coleccion);
-            const secItem = TraductorComponentes._limpiarVar(p.iterador);
-            return `const ${secItem} = ${secId}?.[${trackId}];`;
+            const secId   = TraductorComponentes._limpiarVar(p.iterador);
+            const secItem = TraductorComponentes._limpiarVar(p.coleccion);
+            return `    const ${secItem} = ${secId}?.[${trackId}];`;
         }).join('\n');
 
         const body   = TraductorComponentes._generarElementos(el.body, entornoLocal, erroresSem);
@@ -375,9 +390,9 @@ ${TraductorComponentes._indentar(body, 2)}
             ? `\n\${ (${colId} ?? []).length === 0 ? \`\n${TraductorComponentes._generarElementos(el.empty, entorno, erroresSem)}\n\` : '' }`
             : '';
 
+        const accesoBloque = secAcceso ? `\n${secAcceso}` : '';
         return (
-`\${ (${colId} ?? []).map((${itemId}, ${trackId}) => {
-    ${secAcceso}
+`\${ (${colId} ?? []).map((${itemId}, ${trackId}) => {${accesoBloque}
     return \`\n${body}\n\`;
 }).join('') }${empty}`
         );
@@ -424,44 +439,44 @@ ${defCase}
         return `\${${el.id}(${argsResueltos.join(', ')})}`;
     }
 
-    /* ══════════════════════════════════════════════════
-       PROCESAMIENTO DE TEXTO E INTERPOLACIÓN
-       ══════════════════════════════════════════════════ */
+    // procesamiento de los textos
     static _procesarTexto(rawVal, entorno, erroresSem) {
         if (!rawVal) return '';
 
         // Quitar comillas externas 
         let txt = String(rawVal).replace(/^["` ]|["` ]$/g, '');
 
-        // 1. Reemplazar expresiones entre backticks
+        //Reemplazar expresiones entre backticks: `$var + 1`
         txt = txt.replace(/`([^`]+)`/g, (_, expr) => {
-            const exprLimpia = expr.replace(/\$([a-zA-Z0-9_]+)/g, (__, v) => {
-                TraductorComponentes._validarVar(v, entorno, erroresSem, `$${v}`, 0);
+            const exprLimpia = expr.replace(/\$([a-zA-Z0-9_]+(?:\[[^\]]*\])?)/g, (__, v) => {
+                const base = v.replace(/\[.*$/, '');
+                TraductorComponentes._validarVar(base, entorno, erroresSem, `$${v}`, 0);
                 return v;
             });
             return `\${${exprLimpia}}`;
         });
 
-        // 2. Reemplazar variables simples $var → ${var}
-        txt = txt.replace(/\$([a-zA-Z0-9_]+)/g, (_, v) => {
-            TraductorComponentes._validarVar(v, entorno, erroresSem, `$${v}`, 0);
+        // Reemplazar $var[index] o $var simples → ${var[index]} o ${var}
+        txt = txt.replace(/\$([a-zA-Z0-9_]+(?:\[[^\]]*\])?)/g, (_, v) => {
+            const base = v.replace(/\[.*$/, '');
+            TraductorComponentes._validarVar(base, entorno, erroresSem, `$${v}`, 0);
             return `\${${v}}`;
         });
 
         return txt;
     }
 
-    /* ══════════════════════════════════════════════════
-       EXPRESIONES
-       ══════════════════════════════════════════════════ */
+    //expresiones
 
     static _expr(nodo, entorno, erroresSem) {
         if (!nodo) return 'false';
 
         switch (nodo.tipo) {
             case 'VAR': {
-                const id = TraductorComponentes._limpiarVar(nodo.val);
-                TraductorComponentes._validarVar(id, entorno, erroresSem, nodo.val, nodo.linea ?? 0);
+                // _limpiarVar quita '$' pero mantiene [index]
+                const id   = TraductorComponentes._limpiarVar(nodo.val);
+                const base = TraductorComponentes._nombreBase(nodo.val);
+                TraductorComponentes._validarVar(base, entorno, erroresSem, nodo.val, nodo.linea ?? 0);
                 return id;
             }
             case 'NUM':    return String(nodo.val);
@@ -495,9 +510,7 @@ ${defCase}
         return TraductorComponentes._expr(nodo, entorno, erroresSem);
     }
 
-    /* ══════════════════════════════════════════════════
-       RESOLUCIÓN DE VALORES
-       ══════════════════════════════════════════════════ */
+    //valores
 
     static _resolverValor(nodo, entorno, erroresSem) {
         if (!nodo) return '';
@@ -534,13 +547,16 @@ ${defCase}
         }
     }
 
-    /* ══════════════════════════════════════════════════
-       HELPERS
-       ══════════════════════════════════════════════════ */
+    // helpers
 
-    /** Quita el prefijo $ de una variable */
+    //Quita el prefijo $ de una variable
     static _limpiarVar(id) {
         return String(id ?? '').replace(/^\$/, '');
+    }
+
+    //Extrae solo el nombre base sin índice de array
+    static _nombreBase(id) {
+        return String(id ?? '').replace(/^\$/, '').replace(/\[.*$/, '');
     }
 
     /** Genera atributo class="" si hay estilos */
@@ -556,9 +572,10 @@ ${defCase}
         return texto.split('\n').map(l => l ? `${sp}${l}` : l).join('\n');
     }
 
-    /** Valida que una variable esté declarada en el entorno */
+    /** Valida que una variable esté declarada en el entorno.*/
     static _validarVar(id, entorno, erroresSem, rawToken, linea) {
-        if (!entorno.obtener(id)) {
+        const base = TraductorComponentes._nombreBase(id);
+        if (!entorno.obtener(base)) {
             erroresSem.push(new ErrorLSS(
                 'Semántico',
                 `Variable "${rawToken}" usada pero no declarada como parámetro`,
@@ -568,14 +585,13 @@ ${defCase}
         }
     }
 
-    /** Convierte la lista de props del submit a Map<clave, nodo> */
     static _propsSubmitMap(props) {
         const m = new Map();
         (props ?? []).forEach(p => m.set(p.clave, p));
         return m;
     }
 
-    /** Convierte la lista de props de un input a Map<clave, valor_resuelto> */
+    // mapeado de listas
     static _propsInputMap(props, entorno, erroresSem) {
         const m = new Map();
         (props ?? []).forEach(p => {

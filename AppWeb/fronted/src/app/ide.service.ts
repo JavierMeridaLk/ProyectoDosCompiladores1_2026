@@ -1,4 +1,4 @@
-import { Injectable, NgZone } from '@angular/core';
+import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import { NotificationService } from './notification.service';
 import { ApiService, CompileResult, CompileError } from './api.service';
@@ -19,9 +19,8 @@ export interface FileNode {
 export class IdeService {
 
   constructor(
-    private notify: NotificationService, 
-    private api: ApiService,
-    private ngZone: NgZone // ✅ NgZone inyectado para reactividad global
+    private notify: NotificationService,
+    private api: ApiService
   ) {}
 
   rootHandle: any = null;
@@ -33,7 +32,6 @@ export class IdeService {
   openFiles = new BehaviorSubject<string[]>([]);
   activeFile = new BehaviorSubject<string | null>(null);
   
-  // ✅ Indicador del cursor global
   cursorPosition = new BehaviorSubject<{line: number, column: number}>({line: 1, column: 1});
 
   fileHandles: Record<string, any> = {};
@@ -46,17 +44,12 @@ export class IdeService {
 
   projectName: string = 'Proyecto_Sin_Nombre';
 
-  // ==========================================
-  // 🧠 MOTOR DE REACTIVIDAD (NUEVO)
-  // ==========================================
   private emitirCambioGlobal(accion: () => void) {
-    this.ngZone.run(() => {
-      accion();
-    });
+    accion();
   }
 
   // =========================
-  // 📁 CARGAR PROYECTO
+  // CARGAR PROYECTO
   // =========================
   async loadProject() {
     try {
@@ -65,7 +58,7 @@ export class IdeService {
 
       const children = await this.readDirectory(this.rootHandle, this.rootHandle.name);
 
-      this.projectName = this.rootHandle.name; // ✅ Actualizamos el nombre para el ZIP
+      this.projectName = this.rootHandle.name;
 
       this.emitirCambioGlobal(() => {
         this.rootName.next(this.rootHandle.name);
@@ -79,7 +72,7 @@ export class IdeService {
   }
 
   // =========================
-  // 🆕 NUEVO PROYECTO
+  // UEVO PROYECTO
   // =========================
   async newProject(name: string) {
     try {
@@ -91,7 +84,7 @@ export class IdeService {
 
       const children = await this.readDirectory(projectHandle, name);
 
-      this.projectName = name; // ✅ Actualizamos el nombre para el ZIP
+      this.projectName = name;
 
       this.emitirCambioGlobal(() => {
         this.rootName.next(name);
@@ -105,7 +98,7 @@ export class IdeService {
   }
 
   // =========================
-  // 🔄 RESET GLOBAL
+  // RESET GLOBAL
   // =========================
   resetState() {
     this.fileHandles = {};
@@ -120,7 +113,7 @@ export class IdeService {
   }
 
   // =========================
-  // 📂 LEER DIRECTORIO
+  // LEER DIRECTORIO
   // =========================
   async readDirectory(dirHandle: any, currentPath: string): Promise<FileNode[]> {
     const nodes: FileNode[] = [];
@@ -151,7 +144,7 @@ export class IdeService {
   }
 
   // =========================
-  // 📄 ARCHIVOS
+  // ARCHIVOS
   // =========================
   async openFile(path: string) {
     const handle = this.fileHandles[path];
@@ -239,7 +232,7 @@ export class IdeService {
   }
 
   // =========================
-  // 📍 CURSOR
+  // CURSOR
   // =========================
   updateCursorPosition(line: number, column: number) {
     this.emitirCambioGlobal(() => {
@@ -248,7 +241,7 @@ export class IdeService {
   }
 
   // =========================
-  // ➕ CREAR
+  // CREAR
   // =========================
   async createFile(name: string) {
     if (!this.rootHandle) return;
@@ -285,7 +278,7 @@ export class IdeService {
   }
 
   // =========================
-  // 🔄 REFRESCAR
+  // REFRESCAR
   // =========================
   async refreshTree() {
     if (!this.rootHandle) return;
@@ -299,7 +292,7 @@ export class IdeService {
   }
 
   // =========================
-  // 🚚 MOVER ARCHIVOS
+  // MOVER ARCHIVOS
   // =========================
   async moveFile(fileNode: FileNode, targetFolder: FileNode) {
     if (fileNode.type !== 'file') return;
@@ -361,15 +354,38 @@ export class IdeService {
   }
 
   // =========================
-  // ▶️ COMPILAR PROYECTO
+  // ▶COMPILAR PROYECTO
   // =========================
   compileErrors = new BehaviorSubject<CompileError[]>([]);
   compiling = new BehaviorSubject<boolean>(false);
 
+  private async _leerArchivosProyecto(): Promise<Array<{path: string, content: string}>> {
+    const resultado = new Map<string, string>();
+
+    // Lo que ya está en memoria
+    for (const [path, content] of Object.entries(this.fileContents)) {
+      if (/\.(y|comp|styles|db)$/.test(path)) {
+        resultado.set(path, content);
+      }
+    }
+
+    // Archivos en el proyecto que todavía no se han abierto en el editor
+    for (const [path, handle] of Object.entries(this.fileHandles)) {
+      if (!/\.(y|comp|styles|db)$/.test(path)) continue;
+      if (resultado.has(path)) continue;
+      try {
+        const file: File = await handle.getFile();
+        const content = await file.text();
+        resultado.set(path, content);
+        this.fileContents[path] = content; 
+      } catch { /* omitir*/ }
+    }
+
+    return Array.from(resultado.entries()).map(([path, content]) => ({ path, content }));
+  }
+
   async compileProject() {
-    const files = Object.entries(this.fileContents)
-      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
-      .map(([path, content]) => ({ path, content }));
+    const files = await this._leerArchivosProyecto();
 
     if (!files.length) {
       this.notify.error('No hay archivos del proyecto para compilar');
@@ -414,12 +430,10 @@ export class IdeService {
   }
 
   // =========================
-  // 👁️ VISTA PREVIA
+  // VISTA PREVIA
   // =========================
   async previewProject() {
-    const files = Object.entries(this.fileContents)
-      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
-      .map(([path, content]) => ({ path, content }));
+    const files = await this._leerArchivosProyecto();
 
     if (!files.length) {
       this.notify.error('No hay archivos del proyecto para previsualizar');
@@ -428,17 +442,67 @@ export class IdeService {
 
     try {
       const titulo = this.rootName.value || 'Proyecto LSS';
-      const html   = await this.api.previewProject(files, titulo);
-      const blob   = new Blob([html], { type: 'text/html' });
-      const url    = URL.createObjectURL(blob);
+      let html     = await this.api.previewProject(files, titulo);
+
+      html = await this._resolverRutasImagenes(html);
+
+      const blob = new Blob([html], { type: 'text/html' });
+      const url  = URL.createObjectURL(blob);
       window.open(url, '_blank');
     } catch {
       this.notify.error('Error al generar la vista previa');
     }
   }
 
+  private async _resolverRutasImagenes(html: string): Promise<string> {
+    const IMAGE_EXT = /\.(png|jpg|jpeg|gif|svg|webp|bmp|ico)$/i;
+
+    const relativePaths = new Set<string>();
+    html.replace(/src="([^"]+)"/g, (_, p: string) => {
+      if (!p.startsWith('http') && !p.startsWith('data:') && !p.startsWith('blob:')) relativePaths.add(p);
+      return _;
+    });
+    html.replace(/url\(['"]?([^'")\s]+)['"]?\)/g, (_, p: string) => {
+      if (!p.startsWith('http') && !p.startsWith('data:') && !p.startsWith('blob:')) relativePaths.add(p);
+      return _;
+    });
+
+    const reemplazos = new Map<string, string>();
+
+    for (const relPath of relativePaths) {
+      if (!IMAGE_EXT.test(relPath)) continue;
+
+      const cleanPath = relPath.replace(/^\.\//, '').replace(/^\//, '');
+
+      const entry = Object.entries(this.fileHandles).find(([p]) =>
+        p.endsWith('/' + cleanPath) || p === cleanPath
+      );
+      if (!entry) continue;
+      try {
+        const file: File = await entry[1].getFile();
+        const dataUrl    = await this._archivoADataUrl(file);
+        reemplazos.set(relPath, dataUrl);
+      } catch { /* omitir */ }
+    }
+
+    for (const [rel, dataUrl] of reemplazos) {
+      html = html.split(rel).join(dataUrl);
+    }
+
+    return html;
+  }
+
+  private _archivoADataUrl(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
   // =========================
-  // 📦 EXPORTAR PRODUCCIÓN
+  // EXPORTAR PRODUCCIÓN
   // =========================
   async exportProject() {
     if (!this.rootHandle) {
@@ -446,9 +510,7 @@ export class IdeService {
       return;
     }
 
-    const files = Object.entries(this.fileContents)
-      .filter(([p]) => /\.(y|comp|styles|db)$/.test(p))
-      .map(([path, content]) => ({ path, content }));
+    const files = await this._leerArchivosProyecto();
 
     if (!files.length) {
       this.notify.error('No hay archivos del proyecto para exportar');
@@ -495,7 +557,7 @@ export class IdeService {
   }
 
   // =========================
-  // 🗑 ELIMINAR NODO
+  // ELIMINAR 
   // =========================
   async deleteNode(node: FileNode) {
     if (!this.rootHandle) return;
@@ -530,7 +592,7 @@ export class IdeService {
   }
 
   // =========================
-  // 📦 EXPORTAR ZIP
+  // EXPORTAR ZIP
   // =========================
   async exportProjectAsZip() {
     const zip = new JSZip();
@@ -548,7 +610,6 @@ export class IdeService {
     saveAs(content, nombreZip);
   }
 
-  // ✅ Ahora exporta TODOS los archivos del proyecto, no solo las pestañas abiertas
   getAllFilesContent(): Record<string, string> {
     return this.fileContents; 
   }

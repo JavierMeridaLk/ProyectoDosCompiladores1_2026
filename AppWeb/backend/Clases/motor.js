@@ -13,7 +13,7 @@ class Motor {
 
     /**
      * Ejecuta la traducción de un archivo según su extensión.
-     * @param {string} rutaEntrada  Ruta absoluta o relativa al archivo fuente
+     * @param {string} rutaEntrada 
      * @returns {{ salida: string, errores: ErrorLSS[] } | null}
      */
     static async ejecutar(rutaEntrada) {
@@ -53,7 +53,6 @@ class Motor {
                     break;
 
                 case '.db':
-                    // TraductorDB.analizar es async
                     resultado    = await TraductorDB.analizar(contenido, false);
                     codigoSalida = resultado.sql ?? '';
                     nombreSalida = path.basename(rutaAbs, '.db') + '.sql';
@@ -76,7 +75,7 @@ class Motor {
             return null;
         }
 
-        // ── Reporte de errores ──
+        // Reporte de errores 
         const errores = resultado?.errores ?? [];
         console.log(`\n📋  ERRORES ENCONTRADOS: ${errores.length}`);
 
@@ -103,7 +102,7 @@ class Motor {
             });
         }
 
-        // ── Guardar archivo de salida ──
+        //Guardar archivo de salida
         if (typeof codigoSalida !== 'string') {
             codigoSalida = JSON.stringify(codigoSalida, null, 2);
         }
@@ -121,12 +120,10 @@ class Motor {
         return { salida: rutaSalida, errores };
     }
 
-    /**
-     * Procesa un archivo desde su contenido en memoria (para uso del servidor web).
-     */
-    static async ejecutarDesdeContenido(nombreArchivo, contenido) {
+    // ejecuta el archivo con las datos de memotria
+    static async ejecutarDesdeContenido(nombreArchivo, contenido, archivosEnMemoria = null) {
         const ext  = path.extname(nombreArchivo).toLowerCase();
-        const tipo = ext.slice(1); // 'y', 'comp', 'styles', 'db'
+        const tipo = ext.slice(1);
 
         let resultado    = null;
         let codigoSalida = '';
@@ -148,7 +145,7 @@ class Motor {
                     resultado    = await TraductorDB.analizar(contenido, false);
                     codigoSalida = resultado.sql ?? '';
 
-                    // Ejecutar el SQL generado en la base de datos real
+                    // Ejecutar el SQL generado en la base de datos
                     let dbResultado = null;
                     if (codigoSalida.trim()) {
                         try {
@@ -174,7 +171,7 @@ class Motor {
                 }
 
                 case '.y':
-                    resultado    = TraductorPrincipal.analizar(contenido, nombreArchivo);
+                    resultado    = TraductorPrincipal.analizar(contenido, nombreArchivo, archivosEnMemoria);
                     codigoSalida = resultado.js ?? '';
                     break;
 
@@ -198,34 +195,41 @@ class Motor {
         };
     }
 
-    /** Runtime JS que toda app LSS necesita para ejecutar queries desde el navegador. */
+    // Runtime para ejecutar con el navegador
     static _runtimeSQL() {
         return `// ── Runtime SQL ──
-async function ejecutarSQL(query) {
-  const res = await fetch('http://localhost:3000/execute-y', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query })
-  });
-  const data = await res.json();
-  if (!data.ok) { console.error('[SQL]', data.error ?? 'Error', '|', data.sql ?? query); return []; }
-  const rows = data.rows ?? [];
-  if (!rows.length) return [];
-  const row = rows[0];
-  if (row.tipo === 'select') {
-    const resultado = row.resultado ?? [];
-    if (!resultado.length) return [];
-    const cols = Object.keys(resultado[0]);
-    if (cols.length === 1) return resultado.map(r => r[cols[0]]);
-    return resultado;
-  }
-  return row.changes ?? 0;
-}`;
-    }
+        // Auto-quotes string values for the LSS query language; leaves numbers unquoted.
+        function __q(v) {
+        if (v === null || v === undefined) return 'null';
+        const s = String(v);
+        if (s === '') return '""';
+        const n = Number(s);
+        if (!isNaN(n) && s.trim() !== '') return s;
+        return '"' + s.replace(/\\\\/g, '\\\\\\\\').replace(/"/g, '\\\\"') + '"';
+        }
+        async function ejecutarSQL(query) {
+        const res = await fetch('http://localhost:3000/execute-y', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query })
+        });
+        const data = await res.json();
+        if (!data.ok) { console.error('[SQL]', data.error ?? 'Error', '|', data.sql ?? query); return []; }
+        const rows = data.rows ?? [];
+        if (!rows.length) return [];
+        const row = rows[0];
+        if (row.tipo === 'select') {
+            const resultado = row.resultado ?? [];
+            if (!resultado.length) return [];
+            const cols = Object.keys(resultado[0]);
+            if (cols.length === 1) return resultado.map(r => r[cols[0]]);
+            return resultado;
+        }
+        return row.changes ?? 0;
+        }`;
+            }
 
-    /**
-     * Ensambla el index.html para PREVIEW (todo embebido, abre con Blob URL).
-     */
+    //Arma el index para la vista previa
     static ensamblarHTML(resultados, titulo = 'Proyecto LSS') {
         const css         = resultados.filter(r => r.tipo === 'styles' && r.salida).map(r => r.salida).join('\n');
         const compJS      = resultados.filter(r => r.tipo === 'comp'   && r.salida).map(r => r.salida).join('\n');
@@ -238,7 +242,36 @@ async function ejecutarSQL(query) {
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>${titulo}</title>
   <style>
+/* ── Base reset ── */
+*, *::before, *::after { box-sizing: border-box; }
+body { margin: 0; padding: 16px; font-family: sans-serif; }
+img { max-width: 100%; height: auto; display: block; }
+div, section, table { overflow: visible; }
+/* ── Carrusel base ── */
+.carousel {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0;
+  scrollbar-width: thin;
+}
+.carousel img {
+  flex-shrink: 0;
+  width: 200px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+/* ── Estilos del proyecto ── */
 ${css}
+/* ── Formularios base ── */
+.__lss-field { display: flex; flex-direction: column; margin-bottom: 8px; }
+.__lss-field label { display: block; margin-bottom: 4px; font-size: inherit; }
+.__lss-field input, .__lss-field select, .__lss-field textarea { width: 100%; box-sizing: border-box; }
+form[class] { display: flex; flex-direction: column; }
+/* ── Overrides post-estilos: evitan overflow y dimensiones fijas en elementos anidados ── */
+div[class]:not(.__lss-field), table[class] { height: auto !important; min-height: 0; }
+p, span { height: auto !important; min-height: 0; }
   </style>
 </head>
 <body>
@@ -255,17 +288,12 @@ ${principalJS}
 </html>`;
     }
 
-    /**
-     * Construye los artefactos de producción.
-     */
-    /**
-     * Construye los artefactos de producción.
-     */
+    //Construye la produccion
     static generarArtefactos(resultados, nombreProyecto = 'proyecto') {
         const archivos     = [];
         const tablaGlobal  = { proyecto: nombreProyecto, archivos: [] };
 
-        // ── CSS (todos los .styles concatenados) ──
+        // ── CSS
         const cssTotal = resultados
             .filter(r => r.tipo === 'styles' && r.salida)
             .map(r => r.salida)
@@ -275,7 +303,7 @@ ${principalJS}
             archivos.push({ nombre: 'styles.css', contenido: cssTotal });
         }
 
-        // ── Componentes (todos los .comp concatenados) ──
+        // ── Componentes
         const compTotal = resultados
             .filter(r => r.tipo === 'comp' && r.salida)
             .map(r => r.salida)
@@ -285,7 +313,7 @@ ${principalJS}
             archivos.push({ nombre: 'components.js', contenido: compTotal });
         }
 
-        // ── Programa principal (.y) con runtime SQL incluido ──
+        // ── Programa principal  conb llamadas a la base de datosd
         const principalTotal = resultados
             .filter(r => r.tipo === 'y' && r.salida)
             .map(r => r.salida)
@@ -301,7 +329,7 @@ ${principalJS}
             archivos.push({ nombre: 'main.js', contenido: mainJS });
         }
 
-        // ── Base de datos (.db → SQL) ──
+        // ── Base de datos
         const sqlTotal = resultados
             .filter(r => r.tipo === 'db' && r.salida)
             .map(r => r.salida)
@@ -311,7 +339,7 @@ ${principalJS}
             archivos.push({ nombre: 'database.sql', contenido: sqlTotal });
         }
 
-        // ── Registrar en tabla global ──
+        // ── Registrar en tabla global
         for (const r of resultados) {
             if (r.ignorado || !r.salida) continue;
             tablaGlobal.archivos.push({
@@ -321,12 +349,12 @@ ${principalJS}
             });
         }
 
-        // ── index.html — app web que enlaza los archivos ──
+        // ── index.html
         const tieneStyles = cssTotal.trim().length > 0;
         const tieneComp   = compTotal.trim().length > 0;
         const tieneMain   = mainJS.trim().length > 0;
 
-        // Se inyecta la etiqueta link solo si el proyecto generó CSS
+        // Se inyecta la etiqueta
         const htmlLinks = tieneStyles 
             ? '  <link rel="stylesheet" href="styles.css">' 
             : '';
@@ -351,7 +379,7 @@ ${scriptTags}
 
         archivos.push({ nombre: 'index.html', contenido: indexHTML });
 
-        // ── Tabla de símbolos (HTML) ──
+        // ── Tabla de símbolos
         archivos.push({
             nombre:    'tabla-simbolos.html',
             contenido: Motor._generarHTMLTablaSimbolos(tablaGlobal)
@@ -422,7 +450,7 @@ ${scriptTags}
                     </table>`;
             }
 
-            // .db — tablas
+            // .db 
             if (ts.tablas?.length) {
                 const tabs = ts.tablas.map(t => {
                     const cols = (t.columnas ?? []).map(c => `${c.col}: ${c.tipo}`).join(', ');
@@ -481,9 +509,7 @@ ${scriptTags}
 </html>`;
     }
 
-    /**
-     * Ejecuta todos los archivos de prueba en secuencia.
-     */
+    //se jecuta todos los archivpos de prueba
     static async ejecutarPruebas() {
         console.log('\n' + '█'.repeat(60));
         console.log('  MOTOR LSS — EJECUCIÓN DE PRUEBAS');
@@ -522,7 +548,7 @@ ${scriptTags}
 
 module.exports = Motor;
 
-// ── Ejecución directa: node motor.js ──
+//node motor.js
 if (require.main === module) {
     Motor.ejecutarPruebas().catch(err => {
         console.error('Error inesperado en el motor:', err);

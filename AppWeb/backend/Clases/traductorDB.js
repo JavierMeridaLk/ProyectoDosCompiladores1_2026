@@ -1,31 +1,49 @@
 'use strict';
 
 /**
- * traductorDB.js
  * Traductor del lenguaje .db → SQL (SQLite)
  */
 
 const ParserDB = require('../Analizadores/DBJison');
 const ErrorLSS = require('./Errores');
 
-/* ════════════════════════════════════════════════════════════
-   TABLA DE SÍMBOLOS PARA LA BASE DE DATOS
-   ════════════════════════════════════════════════════════════ */
+// tabla de simbolso para db
 class EntornoDB {
     constructor() {
+        this.tablas    = new Map();
+        this._preloaded = new Set();
+    }
 
-        this.tablas = new Map();
+    //precarasd e tablas y columans existentes
+    precargarTabla(nombre) {
+        if (!this.tablas.has(nombre)) {
+            const columnas = new Map();
+            columnas.set('id', 'INTEGER');
+            this.tablas.set(nombre, columnas);
+        }
+        this._preloaded.add(nombre);
+    }
+
+    precargarColumna(tabla, columna, tipoSQL) {
+        if (this.tablas.has(tabla) && columna !== 'id') {
+            this.tablas.get(tabla).set(columna, tipoSQL || 'TEXT');
+        }
     }
 
     /**
-     * Registra una tabla nueva.
-     * @returns {boolean} false si ya existía
+     * Registra una tabla nueva en la sesión actual.
+     * @returns {boolean} 
      */
     registrarTabla(nombre) {
-        if (this.tablas.has(nombre)) return false;
-        const columnas = new Map();
-        columnas.set('id', 'INTEGER'); 
-        this.tablas.set(nombre, columnas);
+        // Si ya existe y no vino de la BD
+        if (this.tablas.has(nombre) && !this._preloaded.has(nombre)) return false;
+        if (!this.tablas.has(nombre)) {
+            const columnas = new Map();
+            columnas.set('id', 'INTEGER');
+            this.tablas.set(nombre, columnas);
+        }
+        // Deja de estar marcada como pre-cargada 
+        this._preloaded.delete(nombre);
         return true;
     }
 
@@ -48,18 +66,42 @@ class EntornoDB {
     }
 }
 
-/* ════════════════════════════════════════════════════════════
-   CLASE PRINCIPAL
-   ════════════════════════════════════════════════════════════ */
+// clase princiala
 class TraductorDB {
+
+    // craga de esquema de la BD para validación semántica
+    static _cargarEsquemaDB(entorno, db) {
+        return new Promise((resolve) => {
+            db.all(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
+                [],
+                (err, tables) => {
+                    if (err || !tables || tables.length === 0) { resolve(); return; }
+                    let pendiente = tables.length;
+                    tables.forEach(t => {
+                        entorno.precargarTabla(t.name);
+                        db.all(`PRAGMA table_info("${t.name}")`, [], (err2, cols) => {
+                            if (!err2 && cols) {
+                                cols.forEach(c => {
+                                    entorno.precargarColumna(t.name, c.name, c.type);
+                                });
+                            }
+                            if (--pendiente === 0) resolve();
+                        });
+                    });
+                }
+            );
+        });
+    }
 
     /**
      * Punto de entrada principal.
-     * @param {string} entrada     
-     * @param {boolean} ejecutar  
+     * @param {string}  entrada
+     * @param {boolean} ejecutar
+     * @param {object|null} db  
      * @returns {{ sql: string, errores: ErrorLSS[], resultado?: any }}
      */
-    static async analizar(entrada, ejecutar = false) {
+    static async analizar(entrada, ejecutar = false, db = null) {
         const parserObj = ParserDB.parser;
         parserObj.yy = { errores: [] };
         parserObj.yy.parseError = function(msg, hash) {
@@ -74,9 +116,11 @@ class TraductorDB {
         let ast    = [];
         const errores = [];
 
-        /* ── Fase 1: Parseo ── */
+        // parseo
         try {
-            const resultado = ParserDB.parse(entrada);
+
+            const entradaNorm = entrada.trim().endsWith(';') ? entrada : entrada.trim() + ';';
+            const resultado = ParserDB.parse(entradaNorm);
             ast             = resultado?.ast ?? [];
             const rawErrs   = parserObj.yy.errores ?? [];
 
@@ -99,8 +143,13 @@ class TraductorDB {
             return { sql: '-- Error crítico: no se pudo parsear el archivo .db', errores };
         }
 
-        /* ── Fase 2: Traducción + validación semántica ── */
+        //Fase 2: Traducción y validación semántica
         const entorno    = new EntornoDB();
+
+        if (db) {
+            await this._cargarEsquemaDB(entorno, db);
+        }
+
         const erroresSem = [];
 
         const instrucciones = ast
@@ -112,7 +161,7 @@ class TraductorDB {
 
         const sql = instrucciones.join('\n\n');
 
-        /* ── Fase 3: Ejecución ── */
+        //Ejecución
         if (ejecutar) {
             try {
                 console.warn('[TraductorDB] Ejecución habilitada pero dbExecutor no está conectado.');
@@ -135,7 +184,7 @@ class TraductorDB {
         return { sql, errores, tablaSimbolos };
     }
 
-    /* ── Despacho por tipo de nodo ── */
+    //traduccion por nodos con switch
     static _traducirInstruccion(nodo, entorno, erroresSem) {
         switch (nodo.tipo) {
             case 'CREATE':     return this._traducirCreate(nodo, entorno, erroresSem);
@@ -153,9 +202,7 @@ class TraductorDB {
         }
     }
 
-    /* ══════════════════════════════════════════════════════════
-       CREATE TABLE
-       ══════════════════════════════════════════════════════════ */
+    // creacion de tabla
     static _traducirCreate(nodo, entorno, erroresSem) {
         if (!entorno.registrarTabla(nodo.tabla)) {
             erroresSem.push(new ErrorLSS(
@@ -181,9 +228,7 @@ class TraductorDB {
         );
     }
 
-    /* ══════════════════════════════════════════════════════════
-       SELECT COLUMN
-       ══════════════════════════════════════════════════════════ */
+    //sdeleccion de tablas y columnas
     static _traducirSelectCol(nodo, entorno, erroresSem) {
         if (!entorno.existeTabla(nodo.tabla)) {
             erroresSem.push(new ErrorLSS(
@@ -201,12 +246,10 @@ class TraductorDB {
             ));
             return null;
         }
-        return `SELECT ${nodo.col} FROM ${nodo.tabla};`;
+        return `SELECT ${nodo.col} FROM ${nodo.tabla} ORDER BY id;`;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       INSERT
-       ══════════════════════════════════════════════════════════ */
+    //insetr en tabla
     static _traducirInsert(nodo, entorno, erroresSem) {
         if (!entorno.existeTabla(nodo.tabla)) {
             erroresSem.push(new ErrorLSS(
@@ -243,9 +286,7 @@ class TraductorDB {
         return `INSERT INTO ${nodo.tabla} (${cols.join(', ')}) VALUES (${vals.join(', ')});`;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       UPDATE
-       ══════════════════════════════════════════════════════════ */
+    //update en tabla
     static _traducirUpdate(nodo, entorno, erroresSem) {
         if (!entorno.existeTabla(nodo.tabla)) {
             erroresSem.push(new ErrorLSS(
@@ -281,9 +322,7 @@ class TraductorDB {
         return `UPDATE ${nodo.tabla} SET ${asigs.join(', ')} WHERE id = ${idVal};`;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       DELETE
-       ══════════════════════════════════════════════════════════ */
+    // delete en ytabla
     static _traducirDelete(nodo, entorno, erroresSem) {
         if (!entorno.existeTabla(nodo.tabla)) {
             erroresSem.push(new ErrorLSS(
@@ -297,9 +336,7 @@ class TraductorDB {
         return `DELETE FROM ${nodo.tabla} WHERE id = ${idVal};`;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       EVALUADOR DE EXPRESIONES AST
-       ══════════════════════════════════════════════════════════ */
+    // Evalúa una expresión del AST a un valor primitivo
     static _evaluarExpresion(nodo, erroresSem) {
         if (nodo === null || nodo === undefined) return null;
 
@@ -352,12 +389,10 @@ class TraductorDB {
         return nodo;
     }
 
-    /* ══════════════════════════════════════════════════════════
-       VALIDACIÓN DE TIPOS
-       ══════════════════════════════════════════════════════════ */
+    // validacion por tipś
     static _validarTipoValor(valor, tipoSQL, columna, tabla, linea, erroresSem) {
         if (valor === null || valor === undefined) return;
-        if (tipoSQL === null) return;   // columna sin tipo conocido, ya se reportó
+        if (tipoSQL === null) return; 
 
         const esNumero  = typeof valor === 'number';
         const esString  = typeof valor === 'string';
@@ -379,9 +414,7 @@ class TraductorDB {
         }
     }
 
-    /* ══════════════════════════════════════════════════════════
-       HELPERS
-       ══════════════════════════════════════════════════════════ */
+    //helpers
 
     static _mapearTipo(token) {
         switch (token) {

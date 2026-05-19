@@ -72,10 +72,7 @@
 %start inicio
 
 %%
-
-/* ══════════════════════════════════════════════════════════
-   PUNTO DE ENTRADA
-   ══════════════════════════════════════════════════════════ */
+//incio
 
 inicio
     : lista_consultas EOF
@@ -124,9 +121,7 @@ instruccion
     | eliminar_registro         { $$ = $1; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   CREAR TABLA
-   ══════════════════════════════════════════════════════════ */
+//creacion
 
 crear_tabla
     : TABLE IDENTIFICADOR COLUMNS lista_definicion_columnas
@@ -181,9 +176,7 @@ tipos_permitidos
     | TYPE_DOUBLE   { $$ = 'TYPE_DOUBLE'; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   SELECCIONAR COLUMNA
-   ══════════════════════════════════════════════════════════ */
+//select
 
 seleccionar_columna
     : IDENTIFICADOR '.' IDENTIFICADOR
@@ -197,9 +190,7 @@ seleccionar_columna
         }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   INSERTAR REGISTRO
-   ══════════════════════════════════════════════════════════ */
+//insert
 
 insertar_registro
     : IDENTIFICADOR '[' lista_asignaciones ']'
@@ -213,9 +204,7 @@ insertar_registro
         }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   ACTUALIZAR REGISTRO
-   ══════════════════════════════════════════════════════════ */
+//actualixacon
 
 actualizar_registro
     : IDENTIFICADOR '[' lista_asignaciones ']' IN expresion_entera
@@ -230,9 +219,7 @@ actualizar_registro
         }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   ELIMINAR REGISTRO
-   ══════════════════════════════════════════════════════════ */
+//eliminacion
 
 eliminar_registro
     : IDENTIFICADOR DELETE expresion_entera
@@ -246,9 +233,7 @@ eliminar_registro
         }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   LISTA DE ASIGNACIONES
-   ══════════════════════════════════════════════════════════ */
+//asignaciones
 
 lista_asignaciones
     : lista_asignaciones ',' asignacion
@@ -273,9 +258,7 @@ asignacion
         { $$ = { col: $1, val: $3, linea: @1.first_line }; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   EXPRESIONES
-   ══════════════════════════════════════════════════════════ */
+//expresiones
 
 expresion
     : expresion '+' expresion
@@ -309,3 +292,66 @@ expresion_entera
     | IDENTIFICADOR
         { $$ = { tipo: 'ID', val: $1, linea: @1.first_line }; }
     ;
+
+%%
+
+//coloreafo
+
+var _DB_HL = {
+    'TABLE':'keyword','COLUMNS':'keyword','IN':'keyword','DELETE':'keyword',
+    'TYPE_INT':'keyword','TYPE_STRING':'keyword','TYPE_NUMBER':'keyword',
+    'TYPE_BOOLEAN':'keyword','TYPE_FLOAT':'keyword','TYPE_DOUBLE':'keyword',
+    'TRUE':'literal','FALSE':'literal',
+    'NUMERO':'number','CADENA':'string',
+    'IDENTIFICADOR':'identifier',
+    '+':'operator','-':'operator','*':'operator','/':'operator','=':'operator',
+    '(':'delimiter',')':'delimiter','[':'delimiter',']':'delimiter',
+    ';':'identifier',',':'identifier','.':'identifier',
+    'EOF':null
+};
+
+function _dbLexSeg(seg, offset) {
+    var out = [], lex = parser.lexer, eofId = parser.symbols_['EOF'] || 1;
+    lex.yy = { errores: [] };
+    lex.setInput(seg);
+    try {
+        var tok, name, cls;
+        while (true) {
+            tok = lex.lex();
+            if (!tok || tok === 1 || tok === eofId || lex.done) break;
+            name = parser.terminals_[tok] || ('' + tok);
+            cls = _DB_HL[name];
+            if (cls === undefined) cls = 'identifier';
+            if (cls !== null)
+                out.push({ startIndex: offset + (lex.yylloc ? lex.yylloc.first_column : 0), scopes: cls });
+        }
+    } catch(e) {}
+    return out;
+}
+
+parser.tokenizeLine = function(line, inBlockComment) {
+    var tokens = [], inCmt = !!inBlockComment, i = 0, LC = '//';
+    while (i <= line.length) {
+        if (inCmt) {
+            var close = line.indexOf('*/', i);
+            tokens.push({ startIndex: i, scopes: 'comment' });
+            if (close === -1) return { tokens: tokens, endState: true };
+            i = close + 2; inCmt = false; continue;
+        }
+        var bS = line.indexOf('/*', i);
+        var lS = LC ? line.indexOf(LC, i) : -1;
+        var nxt = -1, nt = '';
+        if (bS !== -1) { nxt = bS; nt = 'block'; }
+        if (lS !== -1 && (nxt === -1 || lS < nxt)) { nxt = lS; nt = 'line'; }
+        var cEnd = nxt === -1 ? line.length : nxt;
+        if (cEnd > i) tokens = tokens.concat(_dbLexSeg(line.substring(i, cEnd), i));
+        if (nxt === -1) break;
+        tokens.push({ startIndex: nxt, scopes: 'comment' });
+        if (nt === 'line') break;
+        var ca = line.indexOf('*/', nxt + 2);
+        if (ca === -1) { inCmt = true; break; }
+        i = ca + 2;
+    }
+    return { tokens: tokens, endState: inCmt };
+};
+if (typeof window !== 'undefined') window.DBJison = { parser: parser };

@@ -1,5 +1,7 @@
 <div class="editor-toolbar">
 
+    <!-- selector de colroes -->
+  
   <button (click)="openColorPicker()">🎨 Elegir color</button>
 
   <input
@@ -12,20 +14,27 @@
 
   <div class="color-preview" [style.background]="selectedColor"></div>
 
-  <!-- FORMATO -->
+  <!-- formatod e colores -->
   <select [(ngModel)]="format">
     <option value="hex">HEX</option>
     <option value="rgb">RGB</option>
   </select>
 
-  <!-- VALOR -->
+  <!-- valor -->
   <span class="color-value">
     {{ getFormattedColor() }}
   </span>
 
-  <!-- ACCIONES -->
+  <!-- botones para copiar o insertar-->
   <button (click)="insertColor()">➕ Insertar</button>
   <button (click)="copyColor()">📋 Copiar</button>
+
+  <div class="toolbar-divider"></div>
+
+  <!-- Boton para el indendado automatico -->
+  <button (click)="autoIndent()" title="Aplicar indentación automática al archivo activo">
+    ⇥ Indentar
+  </button>
 
 </div>
 

@@ -1,12 +1,12 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { IdeService } from '../ide.service';
 import { ApiService, DbRow, CompileError } from '../api.service';
 
 interface DbEntry {
-  query: string;           // lo que escribió el usuario
-  sql?: string;            // SQL generado por el traductor
+  query: string;
+  sql?: string; 
   rows: DbRow[];
   errores?: { tipo: string; descripcion: string; linea: number; columna: number }[];
   error?: string;
@@ -32,14 +32,18 @@ export class BottomPanel implements OnInit, AfterViewChecked {
   errors: (CompileError & { archivo?: string })[] = [];
   compiling = false;
 
-  constructor(private ide: IdeService, private api: ApiService) {}
+  constructor(private ide: IdeService, private api: ApiService, private cdr: ChangeDetectorRef) {}
 
   ngOnInit() {
     this.ide.compileErrors.subscribe(errs => {
       this.errors = errs as any;
       if (errs.length) this.activeTab = 'errores';
+      this.cdr.markForCheck();
     });
-    this.ide.compiling.subscribe(v => this.compiling = v);
+    this.ide.compiling.subscribe(v => {
+      this.compiling = v;
+      this.cdr.markForCheck();
+    });
   }
 
   ngAfterViewChecked() {
@@ -73,6 +77,7 @@ export class BottomPanel implements OnInit, AfterViewChecked {
       });
     } finally {
       this.dbLoading = false;
+      this.cdr.markForCheck();
     }
   }
 

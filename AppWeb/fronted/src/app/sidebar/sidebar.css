@@ -1,88 +1,194 @@
-.sidebar-header {
-  padding: 10px 16px;
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  color: var(--ide-text-main);
-}
-
-.file-tree {
+:host {
   display: flex;
   flex-direction: column;
-  font-size: 13px;
+  background: #0d0d17;
+  height: 100%;
+  overflow: hidden;
 }
 
-.tree-item {
+/* ── CABECERA DE SECCIÓN ── */
+.sidebar-section-title {
+  padding: 10px 14px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #44445a;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+/* ── RAÍZ DEL PROYECTO ── */
+.sidebar-root {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 4px 8px;
+  padding: 5px 14px;
   cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: #9090b8;
   user-select: none;
-  border-radius: 4px;
-  font-size: 13px;
+  transition: color 0.12s;
+  flex-shrink: 0;
+  border-bottom: 1px solid #14142a;
 }
 
-.tree-item:hover {
-  background: rgba(255, 255, 255, 0.08);
+.sidebar-root:hover {
+  color: #c8c8e8;
 }
 
-.tree-item.drag-over {
-  border: 1px dashed #4ec9b0;
+.sidebar-root .root-arrow {
+  font-size: 9px;
+  color: #44445a;
+  transition: transform 0.15s;
+  flex-shrink: 0;
 }
 
-.tree-item.active {
-  background-color: #37373d;
-  color: #ffffff;
+.sidebar-root .root-arrow.open {
+  transform: rotate(90deg);
 }
 
-.tree-item.root {
-  font-weight: bold;
-  color: #ffffff;
-  background-color: #2a2d2e;
+.sidebar-root .root-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.arrow {
-  font-size: 10px;
-  color: #888;
-  width: 12px;
-  display: inline-block;
-}
-
-.tree-item.folder {
-  font-weight: 500;
-}
-
-.icon {
-  width: 18px;
+/* ── ESTADO SIN PROYECTO ── */
+.no-project {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 16px;
+  color: #40405a;
+  font-size: 12px;
   text-align: center;
 }
 
-.name {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.no-project .no-project-icon {
+  font-size: 28px;
+  opacity: 0.4;
 }
 
-.actions {
-  margin-left: auto;
-  display: flex;
-  gap: 4px;
-}
-
-.actions button {
-  background: transparent;
-  border: none;
+.btn-load {
+  background: #13132a;
+  border: 1px solid #252545;
+  color: #7070a0;
+  font-size: 11px;
+  padding: 6px 14px;
+  border-radius: 5px;
   cursor: pointer;
-  font-size: 12px;
-  opacity: 0.6;
+  transition: all 0.12s;
 }
 
-.actions button:hover {
+.btn-load:hover {
+  background: #1a1a38;
+  color: #c0c0e8;
+  border-color: #3a3a6a;
+}
+
+/* ── ÁRBOL DE ARCHIVOS ── */
+.file-tree {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 4px 0;
+}
+
+.file-tree::-webkit-scrollbar {
+  width: 4px;
+}
+
+.file-tree::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.file-tree::-webkit-scrollbar-thumb {
+  background: #1e1e3a;
+  border-radius: 2px;
+}
+
+/* ── ÍTEM DEL ÁRBOL ── */
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px 3px 8px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 24px;
+  position: relative;
+  transition: background 0.1s;
+}
+
+.tree-item:hover {
+  background: #13132a;
+}
+
+.tree-item:hover .item-actions {
   opacity: 1;
 }
 
-/* Niveles de indentación */
-.indent-1 { padding-left: 24px; }
-.indent-2 { padding-left: 36px; }
-.indent-3 { padding-left: 48px; }
+.tree-item .item-icon {
+  font-size: 13px;
+  flex-shrink: 0;
+  line-height: 1;
+}
+
+.tree-item .item-name {
+  flex: 1;
+  font-size: 13px;
+  color: #9090b0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color 0.1s;
+}
+
+.tree-item:hover .item-name {
+  color: #d0d0e8;
+}
+
+.tree-item.is-folder > .item-name {
+  color: #8888cc;
+  font-weight: 500;
+}
+
+.tree-item.is-folder:hover > .item-name {
+  color: #b0b0e8;
+}
+
+/* ── BOTONES DE ACCIÓN ── */
+.item-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 0.1s;
+  flex-shrink: 0;
+}
+
+.item-actions button {
+  background: transparent;
+  border: none;
+  color: #55557a;
+  font-size: 13px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: color 0.1s, background 0.1s;
+}
+
+.item-actions button:hover {
+  color: #c0c0e0;
+  background: #1e1e3a;
+}
+
+.item-actions button.del:hover {
+  color: #f08080;
+  background: #2a1a1a;
+}

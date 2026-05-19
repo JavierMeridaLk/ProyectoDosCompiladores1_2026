@@ -11,8 +11,15 @@
 \/\*[\s\S]*?\*\/               /* ignorar comentarios multilínea */
 \/\/.* /* ignorar comentarios de línea */
 
-/* ── Tipos de datos ── */
+/* ── Tipos de datos (arrays primero, antes que los simples) ── */
+"int[]"                         return 'INT_ARR';
+"float[]"                       return 'FLOAT_ARR';
+"double[]"                      return 'FLOAT_ARR';
+"string[]"                      return 'STRING_ARR';
+"bool[]"                        return 'BOOL_ARR';
+"boolean[]"                     return 'BOOL_ARR';
 "int"                           return 'INT';
+"double"                        return 'FLOAT';
 "float"                         return 'FLOAT';
 "string"                        return 'STRING';
 "function"                      return 'FUNCTION';
@@ -92,7 +99,7 @@
 [0-9]+"."[0-9]+                 return 'NUMERO';
 [0-9]+                          return 'NUMERO';
 
-/* ── Identificadores (incluye guión para nombres y estilos) ── */
+/* ── Identificadores ── */
 [a-zA-Z_-][a-zA-Z0-9_-]* return 'IDENTIFICADOR';
 
 <<EOF>>                         return 'EOF';
@@ -125,9 +132,7 @@
 
 %%
 
-/* ══════════════════════════════════════════════════════════
-   PUNTO DE ENTRADA
-   ══════════════════════════════════════════════════════════ */
+// inicio
 
 inicio
     : lista_componentes EOF
@@ -145,7 +150,7 @@ lista_componentes
 componente
     : IDENTIFICADOR '(' parametros_opt ')' '{' elementos '}'
         {
-            /* Validar nombre único */
+
             if (!yy.componentesDefinidos) yy.componentesDefinidos = new Set();
             if (yy.componentesDefinidos.has($1)) {
                 yy.errores.push({
@@ -184,23 +189,27 @@ lista_parametros
     ;
 
 parametro
-    : tipo IDENTIFICADOR { $$ = { tipo: $1, id: $2, linea: @2.first_line }; }
-    | tipo VARIABLE      { $$ = { tipo: $1, id: $2, linea: @2.first_line }; }
+    : tipo IDENTIFICADOR              { $$ = { tipo: $1,         id: $2, linea: @2.first_line }; }
+    | tipo VARIABLE                   { $$ = { tipo: $1,         id: $2, linea: @2.first_line }; }
+    | tipo IDENTIFICADOR '[' ']'      { $$ = { tipo: $1 + '[]', id: $2, linea: @2.first_line }; }
+    | tipo VARIABLE      '[' ']'      { $$ = { tipo: $1 + '[]', id: $2, linea: @2.first_line }; }
     ;
 
 /* Tipos soportados */
 tipo
-    : INT      { $$ = 'int'; }
-    | FLOAT    { $$ = 'float'; }
-    | STRING   { $$ = 'string'; }
-    | FUNCTION { $$ = 'function'; }
-    | BOOL     { $$ = 'bool'; }
-    | ARRAY    { $$ = 'array'; }
+    : INT        { $$ = 'int'; }
+    | FLOAT      { $$ = 'float'; }
+    | STRING     { $$ = 'string'; }
+    | FUNCTION   { $$ = 'function'; }
+    | BOOL       { $$ = 'bool'; }
+    | ARRAY      { $$ = 'array'; }
+    | INT_ARR    { $$ = 'int[]'; }
+    | FLOAT_ARR  { $$ = 'float[]'; }
+    | STRING_ARR { $$ = 'string[]'; }
+    | BOOL_ARR   { $$ = 'bool[]'; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   ELEMENTOS
-   ══════════════════════════════════════════════════════════ */
+//elementos
 
 elementos
     : elementos_lista { $$ = $1; }
@@ -237,7 +246,7 @@ elemento
         }
     ;
 
-/* ── Llamada a otros componentes (ej: BadgeTipo($tipo)) ── */
+/* ── Llamada a otros componentes*/
 llamada_comp
     : IDENTIFICADOR '(' lista_args_opt ')'
         { $$ = { tipo: 'LLAMADA_COMPONENTE', id: $1, args: $3, linea: @1.first_line }; }
@@ -253,7 +262,7 @@ lista_valores
     | valor                   { $$ = [$1]; }
     ;
 
-/* ── Lista de ids de estilos (siempre con '<' '>') ── */
+/* Lista de ids de estilos */
 lista_ids
     : lista_ids ',' IDENTIFICADOR { $1.push($3); $$ = $1; }
     | IDENTIFICADOR               { $$ = [$1]; }
@@ -298,7 +307,7 @@ columna
         { $$ = { tipo: 'CELDA', contenido: $2 }; }
     ;
 
-/* ── Texto T("...") ── */
+/* ── Texto T("") ── */
 texto
     : T '<' lista_ids '>' '(' CADENA ')'
         { $$ = { tipo: 'TEXTO', estilos: $3, val: $6, linea: @1.first_line }; }
@@ -310,7 +319,7 @@ texto
         { $$ = { tipo: 'TEXTO', estilos: [], val: $3, esExpr: true, linea: @1.first_line }; }
     ;
 
-/* ── Imagen IMG<estilos>("url", ...) ── */
+/* ── Imagen IMG<estilos>() ── */
 imagen
     : IMG '<' lista_ids '>' '(' lista_urls ')'
         { $$ = { tipo: 'IMG', estilos: $3, urls: $6, linea: @1.first_line }; }
@@ -329,9 +338,7 @@ url_valor
     | VARIABLE { $$ = { tipo: 'VAR',    val: $1 }; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   FORMULARIOS
-   ══════════════════════════════════════════════════════════ */
+//formularios
 
 formulario
     : FORM '<' lista_ids '>' '{' elementos '}' submit_opt
@@ -410,9 +417,7 @@ prop_input
     | PR_VALUE ':' valor { $$ = { clave: 'value', valor: $3 }; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   VALORES Y EXPRESIONES
-   ══════════════════════════════════════════════════════════ */
+//valores y expreiones
 
 valor
     : CADENA      { $$ = { tipo: 'STRING', val: $1,          linea: @1.first_line }; }
@@ -444,11 +449,9 @@ expresion
     | valor                     { $$ = $1; }
     ;
 
-/* ══════════════════════════════════════════════════════════
-   LÓGICA DE CONTROL
-   ══════════════════════════════════════════════════════════ */
+//logica del control de flujo
 
-/* ── For ── */
+//FOR
 logica_for
     /* for each simple */
     : FOR EACH '(' VARIABLE ':' VARIABLE ')' '{' elementos '}'
@@ -549,7 +552,7 @@ logica_switch
 
 lista_casos
     : lista_casos ',' caso { $1.push($3); $$ = $1; }
-    | lista_casos caso     { $1.push($2); $$ = $1; } /* Soporta casos sin coma separadora si se olvida */
+    | lista_casos caso     { $1.push($2); $$ = $1; }
     | caso                 { $$ = [$1]; }
     ;
 
@@ -566,3 +569,75 @@ default_opt
     | /* vacío */
         { $$ = null; }
     ;
+
+%%
+
+//coloreado
+
+var _COMP_HL = {
+    'INT':'keyword','FLOAT':'keyword','STRING':'keyword','FUNCTION':'keyword','BOOL':'keyword','ARRAY':'keyword',
+    'INT_ARR':'keyword','FLOAT_ARR':'keyword','STRING_ARR':'keyword','BOOL_ARR':'keyword',
+    'T':'keyword','IMG':'keyword','FORM':'keyword','SUBMIT':'keyword',
+    'INPUT_TEXT':'keyword','INPUT_NUMBER':'keyword','INPUT_BOOL':'keyword',
+    'PR_ID':'keyword','PR_LABEL':'keyword','PR_VALUE':'keyword',
+    'FOR':'keyword','EACH':'keyword','TRACK':'keyword','EMPTY':'keyword',
+    'IF':'keyword','ELSE':'keyword','SWITCH':'keyword','CASE':'keyword','DEFAULT':'keyword',
+    'TRUE':'literal','FALSE':'literal',
+    'NUMERO':'number',
+    'CADENA':'string','CADENA_EXPR':'string',
+    'VARIABLE':'variable',
+    'REF_ID':'identifier',
+    'TABLA_OPEN':'delimiter','TABLA_CLOSE':'delimiter',
+    'IDENTIFICADOR':'identifier',
+    'EQ':'operator','NEQ':'operator','LTE':'operator','GTE':'operator','AND':'operator','OR':'operator',
+    '+':'operator','-':'operator','*':'operator','/':'operator','%':'operator','!':'operator',
+    '[':'delimiter',']':'delimiter','(':'delimiter',')':'delimiter','{':'delimiter','}':'delimiter',
+    ',':null,':':null,
+    'EOF':null
+};
+
+function _compLexSeg(seg, offset) {
+    var out = [], lex = parser.lexer, eofId = parser.symbols_['EOF'] || 1;
+    lex.yy = { errores: [] };
+    lex.setInput(seg);
+    try {
+        var tok, name, cls;
+        while (true) {
+            tok = lex.lex();
+            if (!tok || tok === 1 || tok === eofId || lex.done) break;
+            name = parser.terminals_[tok] || ('' + tok);
+            cls = _COMP_HL[name];
+            if (cls === undefined) cls = 'identifier';
+            if (cls !== null)
+                out.push({ startIndex: offset + (lex.yylloc ? lex.yylloc.first_column : 0), scopes: cls });
+        }
+    } catch(e) {}
+    return out;
+}
+
+parser.tokenizeLine = function(line, inBlockComment) {
+    var tokens = [], inCmt = !!inBlockComment, i = 0, LC = '//';
+    while (i <= line.length) {
+        if (inCmt) {
+            var close = line.indexOf('*/', i);
+            tokens.push({ startIndex: i, scopes: 'comment' });
+            if (close === -1) return { tokens: tokens, endState: true };
+            i = close + 2; inCmt = false; continue;
+        }
+        var bS = line.indexOf('/*', i);
+        var lS = LC ? line.indexOf(LC, i) : -1;
+        var nxt = -1, nt = '';
+        if (bS !== -1) { nxt = bS; nt = 'block'; }
+        if (lS !== -1 && (nxt === -1 || lS < nxt)) { nxt = lS; nt = 'line'; }
+        var cEnd = nxt === -1 ? line.length : nxt;
+        if (cEnd > i) tokens = tokens.concat(_compLexSeg(line.substring(i, cEnd), i));
+        if (nxt === -1) break;
+        tokens.push({ startIndex: nxt, scopes: 'comment' });
+        if (nt === 'line') break;
+        var ca = line.indexOf('*/', nxt + 2);
+        if (ca === -1) { inCmt = true; break; }
+        i = ca + 2;
+    }
+    return { tokens: tokens, endState: inCmt };
+};
+if (typeof window !== 'undefined') window.ComponentsJison = { parser: parser };

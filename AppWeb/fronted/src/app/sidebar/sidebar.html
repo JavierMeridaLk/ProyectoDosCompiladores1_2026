@@ -1,51 +1,55 @@
-<div class="sidebar-header" (click)="toggleRoot()">
-  {{ rootOpen ? '📂' : '📁' }} {{ rootName }}
-  <button 
-    *ngIf="!hasProject"
-    (click)="loadProject(); $event.stopPropagation()">
-    📂
-  </button>
-</div>
+<!-- TÍTULO DE SECCIÓN -->
+<div class="sidebar-section-title">Explorador</div>
 
-<div class="file-tree">
-
-  <div *ngIf="rootOpen">
-    <ng-container 
-      *ngTemplateOutlet="recursive; context:{ $implicit: tree }">
-    </ng-container>
+<!-- RAÍZ DEL PROYECTO -->
+@if (hasProject) {
+  <div class="sidebar-root" (click)="toggleRoot()">
+    <span class="root-arrow" [class.open]="rootOpen">▶</span>
+    <span class="root-name">{{ rootName }}</span>
   </div>
+} @else {
+  <div class="no-project">
+    <span class="no-project-icon">⊞</span>
+    <span>Sin proyecto abierto</span>
+    <button class="btn-load" (click)="loadProject()">Cargar proyecto</button>
+  </div>
+}
 
-</div>
+<!-- ÁRBOL DE ARCHIVOS -->
+@if (rootOpen && hasProject) {
+  <div class="file-tree">
+    <ng-container *ngTemplateOutlet="recursive; context:{ $implicit: tree }"></ng-container>
+  </div>
+}
 
+<!-- template recursivo -->
 <ng-template #recursive let-nodes>
-
-  <div *ngFor="let node of nodes">
+  @for (node of nodes; track node.path) {
 
     <div class="tree-item"
-      [style.padding-left.px]="node.depth * 16"
-      draggable="true"
-      (dragstart)="onDragStart(node)"
-      (dragover)="onDragOver($event)"
-      (drop)="onDrop(node)">
+         [class.is-folder]="node.type === 'folder'"
+         [style.padding-left.px]="12 + node.depth * 14"
+         draggable="true"
+         (dragstart)="onDragStart(node)"
+         (dragover)="onDragOver($event)"
+         (drop)="onDrop(node)">
 
-      <span (click)="toggle(node)">
-        {{ getIcon(node) }} {{ node.name }}
+      <span class="item-icon" (click)="toggle(node)">{{ getIcon(node) }}</span>
+      <span class="item-name" (click)="toggle(node)">{{ node.name }}</span>
+
+      <span class="item-actions">
+        @if (node.type === 'folder') {
+          <button (click)="createFile(node, $event)" title="Nuevo archivo">+</button>
+          <button (click)="createFolder(node, $event)" title="Nueva carpeta">⊞</button>
+        }
+        <button class="del" (click)="delete(node, $event)" title="Eliminar">✕</button>
       </span>
 
-    <span class="actions">
-      <button *ngIf="node.type === 'folder'" (click)="createFile(node, $event)">📄</button>
-      <button *ngIf="node.type === 'folder'" (click)="createFolder(node, $event)">📁</button>
-      <button (click)="delete(node, $event)">🗑</button>
-    </span>
-
     </div>
 
-    <div *ngIf="node.type === 'folder' && node.isOpen">
-      <ng-container 
-        *ngTemplateOutlet="recursive; context:{ $implicit: node.children }">
-      </ng-container>
-    </div>
+    @if (node.type === 'folder' && node.isOpen) {
+      <ng-container *ngTemplateOutlet="recursive; context:{ $implicit: node.children }"></ng-container>
+    }
 
-  </div>
-
+  }
 </ng-template>
